@@ -5,7 +5,6 @@ use game::ui::UiPlugin;
 use avian3d::prelude::*;
 use avian3d::debug_render::PhysicsDebugPlugin;
 
-
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -22,7 +21,7 @@ fn main() {
             should_print: false,
         })
         .add_plugins(PhysicsPlugins::default().set(PhysicsInterpolationPlugin::interpolate_all())) 
-        .add_plugins(PhysicsDebugPlugin::default())
+        .add_plugins(PhysicsDebugPlugin::default()) //turn on/off for collider visiblity
         .init_state::<GameState>()
         .add_plugins(WorldPlugin)
         .add_plugins(UiPlugin)
