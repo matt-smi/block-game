@@ -20,6 +20,9 @@ pub type Movement = (
 pub struct Player;
 
 #[derive(Component)]
+pub struct Head; 
+
+#[derive(Component)]
 pub struct Angles2D {
     pub yaw: f32,
     pub pitch: f32,
@@ -53,8 +56,6 @@ fn spawn_player(
     ));
     commands
         .spawn((
-            Mesh3d(head),
-            MeshMaterial3d(voxel.materials[1].clone()),
             Transform {
                 translation: Vec3::new(0.0, 5.0, 0.0),
                 scale: Vec3::splat(PLAYER_SCALE),
@@ -67,7 +68,6 @@ fn spawn_player(
             Player,
             LinearVelocity(INIT_VELOCITY),
             RigidBody::Dynamic,
-            Collider::sphere(PLAYER_SCALE * 0.75),
             default_game_action_map(),
             LockedAxes::new()
                 .lock_rotation_x()
@@ -81,19 +81,29 @@ fn spawn_player(
                 Collider::cuboid(2. * PLAYER_SCALE, 4. * PLAYER_SCALE, 2. * PLAYER_SCALE),
                 Transform::from_xyz(0.0, -3. * PLAYER_SCALE, 0.0),
             ));
+            children.spawn((
+                Mesh3d(head),
+                MeshMaterial3d(voxel.materials[3].clone()),
+                Head,
+                Transform::from_xyz(0.0, 0.0, 0.0),  //player position is at the base of the head
+                Collider::sphere(PLAYER_SCALE * 0.75),
+            ));
         });
 }
 
-//Only about the y-axis,
-fn player_look(single: Single<(Movement, &ActionState<GameAction>), With<Player>>) {
+
+fn player_look(single: Single<(Movement, &ActionState<GameAction>), With<Player>>, head_single: Single<&mut Transform, (With<Head>, Without<Player>)>) {
     let ((mut transform, _, mut angles), action_state) = single.into_inner();
+    let mut head_transform = head_single.into_inner();
 
     let mouse_delta = action_state.axis_pair(&GameAction::Look);
     angles.yaw -= mouse_delta.x
         * MOUSE_SENSITIVITY.clamp(-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2);
+    angles.pitch = (angles.pitch - mouse_delta.y * MOUSE_SENSITIVITY)
+    .clamp(-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2);
 
-    transform.rotation = Quat::from_rotation_y(angles.yaw); //;* Quat::from_rotation_x(angles.pitch); // y and x and we only want z
-    // swap this to angular velocity
+    head_transform.rotation = Quat::from_rotation_x(angles.pitch);
+    transform.rotation = Quat::from_rotation_y(angles.yaw);   
 }
 
 fn player_move(single: Single<(Movement, &ActionState<GameAction>), With<Player>>) {
