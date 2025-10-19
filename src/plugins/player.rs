@@ -1,6 +1,6 @@
+use avian3d::prelude::*;
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
-use avian3d::prelude::*;
 
 use crate::common::*;
 use crate::plugins::world::VoxelResource;
@@ -36,54 +36,67 @@ impl Plugin for PlayerPlugin {
     }
 }
 
-fn spawn_player(mut commands: Commands, voxel: Res<VoxelResource>, mut meshes: ResMut<Assets<Mesh>>) {
-
-    let head = meshes.add(Cuboid::new(PLAYER_SCALE * 1.5, PLAYER_SCALE * 1.5, PLAYER_SCALE * 1.5));
-    let body = meshes.add(Cuboid::new(2. * PLAYER_SCALE, 4. * PLAYER_SCALE, 2. * PLAYER_SCALE));
-    commands.spawn((
-        Mesh3d(head),
-        MeshMaterial3d(voxel.materials[1].clone()),
-        Transform {
-    translation: Vec3::new(0.0, 5.0, 0.0),
-    scale: Vec3::splat(PLAYER_SCALE),
-    ..Default::default()
-        },
-        Angles2D {
-            yaw: 0.0,
-            pitch: 0.0,
-        },
-        Player,
-        LinearVelocity (INIT_VELOCITY),
-        RigidBody::Dynamic,
-        Collider::sphere(PLAYER_SCALE * 0.75), 
-        default_game_action_map(),
-        LockedAxes::new().lock_rotation_x().lock_rotation_z().lock_rotation_y(),
-    )).with_children(|children| {
-        children.spawn((
-            Mesh3d(body),
+fn spawn_player(
+    mut commands: Commands,
+    voxel: Res<VoxelResource>,
+    mut meshes: ResMut<Assets<Mesh>>,
+) {
+    let head = meshes.add(Cuboid::new(
+        PLAYER_SCALE * 1.5,
+        PLAYER_SCALE * 1.5,
+        PLAYER_SCALE * 1.5,
+    ));
+    let body = meshes.add(Cuboid::new(
+        2. * PLAYER_SCALE,
+        4. * PLAYER_SCALE,
+        2. * PLAYER_SCALE,
+    ));
+    commands
+        .spawn((
+            Mesh3d(head),
             MeshMaterial3d(voxel.materials[1].clone()),
-            Collider::cuboid(2. * PLAYER_SCALE, 4. * PLAYER_SCALE, 2. * PLAYER_SCALE),
-            Transform::from_xyz(0.0, -3. * PLAYER_SCALE, 0.0),
-        ));
-
-    });
-    
+            Transform {
+                translation: Vec3::new(0.0, 5.0, 0.0),
+                scale: Vec3::splat(PLAYER_SCALE),
+                ..Default::default()
+            },
+            Angles2D {
+                yaw: 0.0,
+                pitch: 0.0,
+            },
+            Player,
+            LinearVelocity(INIT_VELOCITY),
+            RigidBody::Dynamic,
+            Collider::sphere(PLAYER_SCALE * 0.75),
+            default_game_action_map(),
+            LockedAxes::new()
+                .lock_rotation_x()
+                .lock_rotation_z()
+                .lock_rotation_y(),
+        ))
+        .with_children(|children| {
+            children.spawn((
+                Mesh3d(body),
+                MeshMaterial3d(voxel.materials[1].clone()),
+                Collider::cuboid(2. * PLAYER_SCALE, 4. * PLAYER_SCALE, 2. * PLAYER_SCALE),
+                Transform::from_xyz(0.0, -3. * PLAYER_SCALE, 0.0),
+            ));
+        });
 }
 
-//Only about the y-axis, 
+//Only about the y-axis,
 fn player_look(single: Single<(Movement, &ActionState<GameAction>), With<Player>>) {
     let ((mut transform, _, mut angles), action_state) = single.into_inner();
 
     let mouse_delta = action_state.axis_pair(&GameAction::Look);
-    angles.yaw -= mouse_delta.x * MOUSE_SENSITIVITY
-    .clamp(-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2);
+    angles.yaw -= mouse_delta.x
+        * MOUSE_SENSITIVITY.clamp(-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2);
 
     transform.rotation = Quat::from_rotation_y(angles.yaw); //;* Quat::from_rotation_x(angles.pitch); // y and x and we only want z
-   // swap this to angular velocity
+    // swap this to angular velocity
 }
 
 fn player_move(single: Single<(Movement, &ActionState<GameAction>), With<Player>>) {
-    
     let ((_, mut linear_velocity, angles), action_state) = single.into_inner();
     let mut direction = Vec3::ZERO;
     let yaw_rot = Quat::from_rotation_y(angles.yaw);
@@ -99,4 +112,3 @@ fn player_move(single: Single<(Movement, &ActionState<GameAction>), With<Player>
 
     **linear_velocity = direction.normalize_or_zero() * PLAYER_SPEED;
 }
-

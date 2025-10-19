@@ -1,13 +1,12 @@
 use bevy::prelude::*;
-use bevy::window::CursorGrabMode;
 use bevy::transform::TransformSystem;
+use bevy::window::CursorGrabMode;
 
 use crate::common::GameState;
+use crate::common::*;
 use crate::plugins::player::Player;
 use crate::plugins::player::*;
 use leafwing_input_manager::prelude::*;
-use crate::common::*;
-
 
 const ORBIT_DISTANCE: f32 = 10.0;
 
@@ -20,7 +19,7 @@ impl Plugin for CameraPlugin {
             .add_systems(OnExit(GameState::Playing), unlock_cursor)
             .add_systems(
                 PostUpdate,
-                orbit   
+                orbit
                     .before(TransformSystem::TransformPropagate)
                     .run_if(in_state(GameState::Playing)),
             )
@@ -60,7 +59,10 @@ fn orbit(
     camera.translation = target.translation - camera.forward() * ORBIT_DISTANCE;
 }
 
-fn camera_look(single_player: Single<(Movement, &ActionState<GameAction>), With<Player>>, camera: Single<&mut Transform, (With<Camera>, Without<Player>)>) {
+fn camera_look(
+    single_player: Single<(Movement, &ActionState<GameAction>), With<Player>>,
+    camera: Single<&mut Transform, (With<Camera>, Without<Player>)>,
+) {
     let ((_transform, _, mut angles), action_state) = single_player.into_inner();
     let mut camera_transform = camera.into_inner();
 
@@ -74,5 +76,3 @@ fn camera_look(single_player: Single<(Movement, &ActionState<GameAction>), With<
     let pitch_q = Quat::from_rotation_x(angles.pitch);
     camera_transform.rotation = yaw_q * pitch_q;
 }
-
-

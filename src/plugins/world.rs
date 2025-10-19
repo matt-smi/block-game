@@ -1,8 +1,7 @@
-use bevy::prelude::*;
 use avian3d::prelude::*;
+use bevy::prelude::*;
 
-
-const VOXEL_SIZE: f32 = 1.0; 
+const VOXEL_SIZE: f32 = 1.0;
 pub struct WorldPlugin;
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
