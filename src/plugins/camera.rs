@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;
 use bevy::window::CursorGrabMode;
+use bevy::input::mouse::{MouseWheel, MouseScrollUnit};
 
 use crate::common::GameState;
 use crate::common::*;
@@ -8,7 +9,12 @@ use crate::plugins::player::Player;
 use crate::plugins::player::*;
 use leafwing_input_manager::prelude::*;
 
-const ORBIT_DISTANCE: f32 = 10.0;
+const MAX_ORBIT_DISTANCE: f32 = 10.0;
+
+#[derive(Component)]
+pub struct OrbitDistance {
+    distance: f32, 
+}
 
 #[derive(Component)]
 pub struct CameraPlugin;
@@ -23,6 +29,7 @@ impl Plugin for CameraPlugin {
                     .before(TransformSystem::TransformPropagate)
                     .run_if(in_state(GameState::Playing)),
             )
+            .add_systems(Update, orbit_range.run_if(in_state(GameState::Playing)))
             .add_systems(
                 PostUpdate,
                 camera_look
@@ -36,6 +43,9 @@ fn setup(mut commands: Commands) {
     commands.spawn((
         Camera3d::default(),
         Transform::from_xyz(5.0, 5.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
+        OrbitDistance { 
+            distance: MAX_ORBIT_DISTANCE,
+        }
     ));
 }
 
@@ -52,11 +62,12 @@ fn unlock_cursor(mut windows: Query<&mut Window>) {
 }
 
 fn orbit(
-    mut camera: Single<&mut Transform, With<Camera>>,
+    mut camera: Query<(&mut Transform, &OrbitDistance), With<Camera>>,
     player_transform: Query<&Transform, (With<Player>, Without<Camera>)>,
 ) {
+    let (mut camera_transform, orbit_distance) = camera.single_mut().unwrap();
     let target = player_transform.single().unwrap();
-    camera.translation = target.translation - camera.forward() * ORBIT_DISTANCE;
+    camera_transform.translation = target.translation - camera_transform.forward() * orbit_distance.distance;
 }
 
 fn camera_look(
@@ -75,4 +86,26 @@ fn camera_look(
     let yaw_q = Quat::from_rotation_y(angles.yaw);
     let pitch_q = Quat::from_rotation_x(angles.pitch);
     camera_transform.rotation = yaw_q * pitch_q;
+}
+
+fn orbit_range(
+    mut evr_scroll: EventReader<MouseWheel>,
+    camera: Single<&mut OrbitDistance, With<Camera>>,
+) {
+    let mut orbit_distance = camera.into_inner();
+    for ev in evr_scroll.read() {
+        match ev.unit {
+            MouseScrollUnit::Line => {
+                if ev.y < 0.0 {
+                    orbit_distance.distance = f32::min(orbit_distance.distance + 1.0, MAX_ORBIT_DISTANCE);
+                } else {
+                    orbit_distance.distance = f32::max(orbit_distance.distance - 1.0, MAX_ORBIT_DISTANCE / 3.);
+                }
+
+            }
+            MouseScrollUnit::Pixel => {
+                //println!("Scroll (pixel units): vertical: {}, horizontal: {}", ev.y, ev.x);
+            }
+        }
+    }
 }

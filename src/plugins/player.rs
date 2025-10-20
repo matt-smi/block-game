@@ -65,6 +65,7 @@ fn spawn_player(
                 yaw: 0.0,
                 pitch: 0.0,
             },
+            Visibility::default(),
             Player,
             LinearVelocity(INIT_VELOCITY),
             RigidBody::Dynamic,
