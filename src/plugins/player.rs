@@ -20,7 +20,7 @@ pub type Movement = (
 pub struct Player;
 
 #[derive(Component)]
-pub struct Head; 
+pub struct Head;
 
 #[derive(Component)]
 pub struct Angles2D {
@@ -85,14 +85,16 @@ fn spawn_player(
                 Mesh3d(head),
                 MeshMaterial3d(voxel.materials[3].clone()),
                 Head,
-                Transform::from_xyz(0.0, 0.0, 0.0),  //player position is at the base of the head
+                Transform::from_xyz(0.0, 0.0, 0.0), //player position is at the base of the head
                 Collider::sphere(PLAYER_SCALE * 0.75),
             ));
         });
 }
 
-
-fn player_look(single: Single<(Movement, &ActionState<GameAction>), With<Player>>, head_single: Single<&mut Transform, (With<Head>, Without<Player>)>) {
+fn player_look(
+    single: Single<(Movement, &ActionState<GameAction>), With<Player>>,
+    head_single: Single<&mut Transform, (With<Head>, Without<Player>)>,
+) {
     let ((mut transform, _, mut angles), action_state) = single.into_inner();
     let mut head_transform = head_single.into_inner();
 
@@ -100,10 +102,10 @@ fn player_look(single: Single<(Movement, &ActionState<GameAction>), With<Player>
     angles.yaw -= mouse_delta.x
         * MOUSE_SENSITIVITY.clamp(-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2);
     angles.pitch = (angles.pitch - mouse_delta.y * MOUSE_SENSITIVITY)
-    .clamp(-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2);
+        .clamp(-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2);
 
     head_transform.rotation = Quat::from_rotation_x(angles.pitch);
-    transform.rotation = Quat::from_rotation_y(angles.yaw);   
+    transform.rotation = Quat::from_rotation_y(angles.yaw);
 }
 
 fn player_move(single: Single<(Movement, &ActionState<GameAction>), With<Player>>) {
