@@ -1,5 +1,7 @@
+use avian3d::prelude::*;
 use bevy::prelude::*;
 
+const VOXEL_SIZE: f32 = 0.5;
 pub struct WorldPlugin;
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
@@ -29,7 +31,7 @@ pub fn init_resources(
                 })
             })
             .collect(),
-        mesh: meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
+        mesh: meshes.add(Cuboid::new(VOXEL_SIZE, VOXEL_SIZE, VOXEL_SIZE)),
     });
 }
 
@@ -43,7 +45,9 @@ fn setup(mut commands: Commands, voxel: Res<VoxelResource>) {
             commands.spawn((
                 Mesh3d(voxel.mesh.clone()),
                 MeshMaterial3d(voxel.materials[count % voxel.materials.len()].clone()),
-                Transform::from_xyz(x as f32, 0.0, z as f32),
+                Transform::from_xyz(x as f32 * VOXEL_SIZE, 0.0, z as f32 * VOXEL_SIZE),
+                Collider::cuboid(VOXEL_SIZE, VOXEL_SIZE, VOXEL_SIZE),
+                RigidBody::Static,
             ));
             count += 1;
         }

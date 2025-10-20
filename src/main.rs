@@ -1,3 +1,5 @@
+use avian3d::debug_render::PhysicsDebugPlugin;
+use avian3d::prelude::*;
 use bevy::prelude::*;
 use game::common::{GameState, InputPlugin};
 use game::plugins::*;
@@ -18,11 +20,12 @@ fn main() {
         .add_plugins(DebugPlugin {
             should_print: false,
         })
+        .add_plugins(PhysicsPlugins::default().set(PhysicsInterpolationPlugin::interpolate_all()))
+        //.add_plugins(PhysicsDebugPlugin::default()) //turn on/off for collider visiblity
         .init_state::<GameState>()
         .add_plugins(WorldPlugin)
         .add_plugins(UiPlugin)
         .add_plugins(PlayerPlugin)
-        .add_plugins(MovementPlugin)
         .add_plugins(CameraPlugin)
         .run();
     println!("Program finished running.");
