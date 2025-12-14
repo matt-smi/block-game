@@ -10,16 +10,12 @@ jobs:
   build_and_test:
     name: Game
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        toolchain:
-          - stable
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+        run: rustup update && rustup default
 
       - name: Install system dependencies
         run: |
@@ -35,17 +31,17 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ matrix.toolchain }}-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-${{ matrix.toolchain }}-
+            ${{ runner.os }}-cargo-
 
       - name: Cache cargo build
         uses: actions/cache@v3
         with:
           path: target
-          key: ${{ runner.os }}-cargo-build-${{ matrix.toolchain }}-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-build-${{ matrix.toolchain }}-
+            ${{ runner.os }}-cargo-build-
 
       - name: Build project
         run: cargo build --verbose

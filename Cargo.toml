@@ -6,7 +6,7 @@ default-run = "game"
 
 [dependencies]
 
-bevy = { version = "0.16.1", features = ["dynamic_linking"] }
+bevy = { version = "0.16.1", features = ["dynamic_linking", "bevy_dev_tools"] }
 leafwing-input-manager = "0.17.0"
 regex = "1.11.2"
 tokio = { version = "1.47.1", features = ["full"] }

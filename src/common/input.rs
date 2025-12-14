@@ -35,9 +35,12 @@ pub fn default_game_action_map() -> InputMap<GameAction> {
 #[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug, Reflect)]
 pub enum MenuAction {
     ToggleMenu,
+    ToggleDebug,
 }
 impl MenuAction {
     fn default_menu_action_map() -> InputMap<MenuAction> {
-        InputMap::default().with(MenuAction::ToggleMenu, KeyCode::Escape)
+        InputMap::default()
+            .with(Self::ToggleMenu, KeyCode::Escape)
+            .with(Self::ToggleDebug, KeyCode::KeyV)
     }
 }

@@ -6,7 +6,19 @@ use game::world::WorldPlugin;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                title: "Voxel Game".into(),
+                name: Some("game.app".into()),
+                present_mode: bevy::window::PresentMode::AutoNoVsync,
+                ..default()
+            }),
+            ..default()
+        }))
+        .add_plugins(InputPlugin)
+        .add_plugins(DebugPlugin {
+            should_print: false,
+        })
         .init_state::<GameState>()
         .add_plugins(InputPlugin)
         .add_plugins(WorldPlugin)
