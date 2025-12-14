@@ -20,7 +20,6 @@ fn main() {
             should_print: false,
         })
         .init_state::<GameState>()
-        .add_plugins(InputPlugin)
         .add_plugins(WorldPlugin)
         .add_plugins(UiPlugin)
         .add_plugins(PlayerPlugin)
