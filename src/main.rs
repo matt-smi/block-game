@@ -1,9 +1,9 @@
-use avian3d::debug_render::PhysicsDebugPlugin;
 use avian3d::prelude::*;
 use bevy::prelude::*;
 use game::common::{GameState, InputPlugin};
 use game::plugins::*;
 use game::ui::UiPlugin;
+use game::world::*; 
 
 fn main() {
     App::new()
