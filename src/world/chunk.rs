@@ -14,6 +14,12 @@ pub struct VoxelMapping {
     pub colours: Vec<[f32; 4]>, // should match # of voxel IDs above
 }
 
+impl Default for VoxelMapping {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VoxelMapping {
     pub fn new() -> Self {
         Self {

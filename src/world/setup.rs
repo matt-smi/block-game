@@ -28,6 +28,27 @@ struct Basis {
     v: Vec3,
 }
 
+struct MeshBuffers<'a> {
+    vertices: &'a mut Vec<Vec3>,
+    indices: &'a mut Vec<u16>,
+    normals: &'a mut Vec<Vec3>,
+    colours: &'a mut Vec<[f32; 4]>,
+    base_idx: &'a mut u16,
+}
+
+struct QuadParams {
+    u_start: u32,
+    v_start: u32,
+    u_dimension: u32,
+    v_dimension: u32,
+    depth: u32,
+}
+
+struct FaceParams {
+    normal: Vec3,
+    basis: Basis,
+}
+
 
 /// Contains face visibility data for each direction.
 /// Only contains 0 (air) and 1 (block), does not contain material info.
@@ -97,14 +118,13 @@ fn generate_no_padding_dumby_chunk() -> VoxelData {
                         chunk.set(tx, y, tz, VoxelId::Stone);
                     }
 
-                    if y == TOWER_HEIGHT - 1 && tower_dist <= TOWER_RADIUS as f32 {
-                        if (offset_x + offset_z) % 2 == 0 {
+                    if y == TOWER_HEIGHT - 1 && tower_dist <= TOWER_RADIUS as f32
+                        && (offset_x + offset_z) % 2 == 0 {
                             chunk.set(tx, y, tz, VoxelId::Stone);
                             if y + 1 < CHUNK_DIMENSION {
                                 chunk.set(tx, y + 1, tz, VoxelId::Stone);
                             }
                         }
-                    }
                 }
             }
         }
@@ -230,25 +250,17 @@ fn chunk_view_generator(chunk: &VoxelData) -> ChunkViews {
 
 /// Handles the position/vertice/indice addition for each view.
 fn emit_quads(
-    vertices: &mut Vec<Vec3>,
-    indices: &mut Vec<u16>,
-    normals: &mut Vec<Vec3>,
-    colours: &mut Vec<[f32; 4]>,
+    buffers: &mut MeshBuffers,
+    params: QuadParams,
     normal: Vec3,
-    depth: u32,
-    u_start: u32,
-    v_start: u32,
-    v_dimension: u32,
-    u_dimension: u32,
-    base_idx: &mut u16,
     basis: Basis,
     colour: [f32; 4],
 ) {
-    let depth_f = depth as f32 * VOXEL_SIZE;
-    let u_start_f = u_start as f32 * VOXEL_SIZE;
-    let v_start_f = v_start as f32 * VOXEL_SIZE;
-    let u_end_f = (u_start + u_dimension) as f32 * VOXEL_SIZE;
-    let v_end_f = (v_start + v_dimension) as f32 * VOXEL_SIZE;
+    let depth_f = params.depth as f32 * VOXEL_SIZE;
+    let u_start_f = params.u_start as f32 * VOXEL_SIZE;
+    let v_start_f = params.v_start as f32 * VOXEL_SIZE;
+    let u_end_f = (params.u_start + params.u_dimension) as f32 * VOXEL_SIZE;
+    let v_end_f = (params.v_start + params.v_dimension) as f32 * VOXEL_SIZE;
 
     let face_offset = if normal.x < 0. || normal.y < 0. || normal.z < 0. {
         1.0
@@ -270,41 +282,41 @@ fn emit_quads(
     let v2 = base_pos + u_vec * u_end_f + v_vec * v_end_f;
     let v3 = base_pos + u_vec * u_start_f + v_vec * v_end_f;
 
-    vertices.push(v0);
-    vertices.push(v1);
-    vertices.push(v2);
-    vertices.push(v3);
+    buffers.vertices.push(v0);
+    buffers.vertices.push(v1);
+    buffers.vertices.push(v2);
+    buffers.vertices.push(v3);
 
-    normals.push(-normal);
-    normals.push(-normal);
-    normals.push(-normal);
-    normals.push(-normal);
+    buffers.normals.push(-normal);
+    buffers.normals.push(-normal);
+    buffers.normals.push(-normal);
+    buffers.normals.push(-normal);
 
     let computed_normal = u_vec.cross(v_vec);
     let needs_flip = computed_normal.dot(normal) < 0.;
 
     if needs_flip {
-        indices.push(*base_idx);
-        indices.push(*base_idx + 1);
-        indices.push(*base_idx + 2);
-        indices.push(*base_idx);
-        indices.push(*base_idx + 2);
-        indices.push(*base_idx + 3);
+        buffers.indices.push(*buffers.base_idx);
+        buffers.indices.push(*buffers.base_idx + 1);
+        buffers.indices.push(*buffers.base_idx + 2);
+        buffers.indices.push(*buffers.base_idx);
+        buffers.indices.push(*buffers.base_idx + 2);
+        buffers.indices.push(*buffers.base_idx + 3);
     } else {
-        indices.push(*base_idx);
-        indices.push(*base_idx + 2);
-        indices.push(*base_idx + 1);
-        indices.push(*base_idx);
-        indices.push(*base_idx + 3);
-        indices.push(*base_idx + 2);
+        buffers.indices.push(*buffers.base_idx);
+        buffers.indices.push(*buffers.base_idx + 2);
+        buffers.indices.push(*buffers.base_idx + 1);
+        buffers.indices.push(*buffers.base_idx);
+        buffers.indices.push(*buffers.base_idx + 3);
+        buffers.indices.push(*buffers.base_idx + 2);
     }
 
-    colours.push(colour);
-    colours.push(colour);
-    colours.push(colour);
-    colours.push(colour);
+    buffers.colours.push(colour);
+    buffers.colours.push(colour);
+    buffers.colours.push(colour);
+    buffers.colours.push(colour);
 
-    *base_idx += 4;
+    *buffers.base_idx += 4;
 }
 
 fn get_voxel_position(curr_u: u32, curr_v: u32, basis: Basis, normal: Vec3, depth: u32) -> Vec3 {
@@ -323,13 +335,8 @@ fn get_voxel_position(curr_u: u32, curr_v: u32, basis: Basis, normal: Vec3, dept
 /// Also may be able to use an orthogonal view then make it so we no longer have to sweep the plane, and just grab trailing ones for width/height.
 fn greedy_mesher(
     face: &mut [[u32; CHUNK_DIMENSION as usize]; CHUNK_DIMENSION as usize],
-    vertices: &mut Vec<Vec3>,
-    indices: &mut Vec<u16>,
-    normals: &mut Vec<Vec3>,
-    colours: &mut Vec<[f32; 4]>,
-    normal: Vec3,
-    base_idx: &mut u16,
-    basis: Basis,
+    buffers: &mut MeshBuffers,
+    face_params: FaceParams,
     voxel_mapping: &Res<VoxelMapping>,
     chunk: &VoxelData,
 ) {
@@ -337,11 +344,11 @@ fn greedy_mesher(
         for v in 0..CHUNK_DIMENSION {
             while face[u as usize][v as usize] != 0 {
                 let depth = face[u as usize][v as usize].trailing_zeros();
-                let u_start = u as u32;
-                let v_start = v as u32;
+                let u_start = u;
+                let v_start = v;
 
                 // Get the initial voxel ID that we're trying to merge
-                let initial_pos = get_voxel_position(u_start, v_start, basis, normal, depth);
+                let initial_pos = get_voxel_position(u_start, v_start, face_params.basis, face_params.normal, depth);
                 let curr_id = chunk.get_id(
                     initial_pos.x as u32,
                     initial_pos.y as u32,
@@ -355,7 +362,7 @@ fn greedy_mesher(
 
                 // Expand in V direction, checking voxel ID matches
                 while curr_v < CHUNK_DIMENSION && ((face[u as usize][curr_v as usize] >> depth) & 1) == 1 {
-                    let check_pos = get_voxel_position(u_start, curr_v, basis, normal, depth);
+                    let check_pos = get_voxel_position(u_start, curr_v, face_params.basis, face_params.normal, depth);
                     let check_id = chunk.get_id(
                         check_pos.x as u32,
                         check_pos.y as u32,
@@ -382,7 +389,7 @@ fn greedy_mesher(
                         }
 
                         // Check voxel ID matches
-                        let check_pos = get_voxel_position(curr_u, check_v, basis, normal, depth);
+                        let check_pos = get_voxel_position(curr_u, check_v, face_params.basis, face_params.normal, depth);
                         let check_id = chunk.get_id(
                             check_pos.x as u32,
                             check_pos.y as u32,
@@ -404,18 +411,16 @@ fn greedy_mesher(
 
                 let colour = voxel_mapping.colours[curr_id as usize];
                 emit_quads(
-                    vertices,
-                    indices,
-                    normals,
-                    colours,
-                    normal,
-                    depth,
-                    u_start,
-                    v_start,
-                    v_dimension,
-                    u_dimension,
-                    base_idx,
-                    basis,
+                    buffers,
+                    QuadParams {
+                        u_start,
+                        v_start,
+                        v_dimension,
+                        u_dimension,
+                        depth,
+                    },
+                    face_params.normal,
+                    face_params.basis,
                     colour,
                 );
             }
@@ -488,20 +493,23 @@ fn generate_mesh(
         ),
     ];
 
+    let mut buffers = MeshBuffers {
+        vertices: &mut vertex_buffer,
+        indices: &mut index_buffer,
+        normals: &mut normal_buffer,
+        colours: &mut colour_buffer,
+        base_idx: &mut base_idx,
+    };
+
     for (face, normal, basis) in faces {
         greedy_mesher(
             face,
-            &mut vertex_buffer,
-            &mut index_buffer,
-            &mut normal_buffer,
-            &mut colour_buffer,
-            normal,
-            &mut base_idx,
-            basis,
+            &mut buffers,
+            FaceParams { normal, basis },
             mapping,
             chunk,
         );
-        if vertex_buffer.is_empty() {
+        if buffers.vertices.is_empty() {
             return None;
         }
     }
@@ -522,8 +530,8 @@ fn setup(
     mapping: Res<VoxelMapping>,
 ) {
     let interior_chunk = generate_no_padding_dumby_chunk();
-    for x in 0..100 {
-        for z in 0..49 {
+    for x in 0..50 {
+        for z in 0..50 {
             let mut chunk_views = chunk_view_generator(&interior_chunk);
 
             if let Some(mesh) = generate_mesh(&mut chunk_views, &mapping, &interior_chunk) {

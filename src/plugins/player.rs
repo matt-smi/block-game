@@ -81,7 +81,6 @@ fn spawn_player(
             children.spawn((
                 Mesh3d(body),
                 MeshMaterial3d(handle.clone()),
-                //MeshMaterial3d(voxel.materials[1].clone()),
                 Collider::cuboid(2. * PLAYER_SCALE, 4. * PLAYER_SCALE, 2. * PLAYER_SCALE),
                 Transform::from_xyz(0.0, -3. * PLAYER_SCALE, 0.0),
             ));
