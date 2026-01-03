@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 
 use crate::common::*;
-use crate::world::{VoxelResource, init_resources};
+use crate::world::{VoxelResource};
 
 const INIT_VELOCITY: Vec3 = Vec3::ZERO;
 const PLAYER_SPEED: f32 = 15.0;
@@ -30,7 +30,7 @@ pub struct Angles2D {
 pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_player.after(init_resources))
+        app.add_systems(Startup, spawn_player)
             .add_systems(
                 FixedUpdate,
                 (player_look, player_move).run_if(in_state(GameState::Playing)),
@@ -40,8 +40,8 @@ impl Plugin for PlayerPlugin {
 
 fn spawn_player(
     mut commands: Commands,
-    voxel: Res<VoxelResource>,
     mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>
 ) {
     let head = meshes.add(Cuboid::new(
         PLAYER_SCALE * 1.5,
@@ -53,6 +53,10 @@ fn spawn_player(
         4. * PLAYER_SCALE,
         2. * PLAYER_SCALE,
     ));
+    let handle = materials.add(StandardMaterial {
+        base_color: Color::WHITE,
+        ..default()}); 
+
     commands
         .spawn((
             Transform {
@@ -77,13 +81,14 @@ fn spawn_player(
         .with_children(|children| {
             children.spawn((
                 Mesh3d(body),
-                MeshMaterial3d(voxel.materials[1].clone()),
+                MeshMaterial3d(handle.clone()),
+                //MeshMaterial3d(voxel.materials[1].clone()),
                 Collider::cuboid(2. * PLAYER_SCALE, 4. * PLAYER_SCALE, 2. * PLAYER_SCALE),
                 Transform::from_xyz(0.0, -3. * PLAYER_SCALE, 0.0),
             ));
             children.spawn((
                 Mesh3d(head),
-                MeshMaterial3d(voxel.materials[3].clone()),
+                MeshMaterial3d(handle.clone()),
                 Head,
                 Transform::from_xyz(0.0, 0.0, 0.0),  //player position is at the base of the head
                 Collider::sphere(PLAYER_SCALE * 0.75),
@@ -107,7 +112,7 @@ fn player_look(single: Single<(Movement, &ActionState<GameAction>), With<Player>
 }
 
 fn player_move(single: Single<(Movement, &ActionState<GameAction>), With<Player>>) {
-    let ((_, mut linear_velocity, angles), action_state) = single.into_inner();
+    let ((transform, mut linear_velocity, angles), action_state) = single.into_inner();
     let mut direction = Vec3::ZERO;
     let yaw_rot = Quat::from_rotation_y(angles.yaw);
 
@@ -121,4 +126,6 @@ fn player_move(single: Single<(Movement, &ActionState<GameAction>), With<Player>
     direction += vert * Vec3::Y;
 
     **linear_velocity = direction.normalize_or_zero() * PLAYER_SPEED;
+
+    println!("{:?}", transform.translation);
 }
