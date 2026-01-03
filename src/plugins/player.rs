@@ -18,7 +18,7 @@ pub type Movement = (
 pub struct Player;
 
 #[derive(Component)]
-pub struct Head; 
+pub struct Head;
 
 #[derive(Component)]
 pub struct Angles2D {
@@ -29,18 +29,17 @@ pub struct Angles2D {
 pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_player)
-            .add_systems(
-                FixedUpdate,
-                (player_look, player_move).run_if(in_state(GameState::Playing)),
-            );
+        app.add_systems(Startup, spawn_player).add_systems(
+            FixedUpdate,
+            (player_look, player_move).run_if(in_state(GameState::Playing)),
+        );
     }
 }
 
 fn spawn_player(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>
+    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let head = meshes.add(Cuboid::new(
         PLAYER_SCALE * 1.5,
@@ -54,7 +53,8 @@ fn spawn_player(
     ));
     let handle = materials.add(StandardMaterial {
         base_color: Color::WHITE,
-        ..default()}); 
+        ..default()
+    });
 
     commands
         .spawn((
@@ -88,14 +88,16 @@ fn spawn_player(
                 Mesh3d(head),
                 MeshMaterial3d(handle.clone()),
                 Head,
-                Transform::from_xyz(0.0, 0.0, 0.0),  //player position is at the base of the head
+                Transform::from_xyz(0.0, 0.0, 0.0), //player position is at the base of the head
                 Collider::sphere(PLAYER_SCALE * 0.75),
             ));
         });
 }
 
-
-fn player_look(single: Single<(Movement, &ActionState<GameAction>), With<Player>>, head_single: Single<&mut Transform, (With<Head>, Without<Player>)>) {
+fn player_look(
+    single: Single<(Movement, &ActionState<GameAction>), With<Player>>,
+    head_single: Single<&mut Transform, (With<Head>, Without<Player>)>,
+) {
     let ((mut transform, _, mut angles), action_state) = single.into_inner();
     let mut head_transform = head_single.into_inner();
 
@@ -103,10 +105,10 @@ fn player_look(single: Single<(Movement, &ActionState<GameAction>), With<Player>
     angles.yaw -= mouse_delta.x
         * MOUSE_SENSITIVITY.clamp(-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2);
     angles.pitch = (angles.pitch - mouse_delta.y * MOUSE_SENSITIVITY)
-    .clamp(-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2);
+        .clamp(-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2);
 
     head_transform.rotation = Quat::from_rotation_x(angles.pitch);
-    transform.rotation = Quat::from_rotation_y(angles.yaw);   
+    transform.rotation = Quat::from_rotation_y(angles.yaw);
 }
 
 fn player_move(single: Single<(Movement, &ActionState<GameAction>), With<Player>>) {

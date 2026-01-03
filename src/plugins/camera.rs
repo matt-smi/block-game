@@ -1,7 +1,7 @@
+use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
 use bevy::transform::TransformSystem;
 use bevy::window::CursorGrabMode;
-use bevy::input::mouse::{MouseWheel, MouseScrollUnit};
 
 use crate::common::GameState;
 use crate::common::*;
@@ -13,7 +13,7 @@ const MAX_ORBIT_DISTANCE: f32 = 10.0;
 
 #[derive(Component)]
 pub struct OrbitDistance {
-    distance: f32, 
+    distance: f32,
 }
 
 #[derive(Component)]
@@ -43,9 +43,9 @@ fn setup(mut commands: Commands) {
     commands.spawn((
         Camera3d::default(),
         Transform::from_xyz(5.0, 5.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
-        OrbitDistance { 
+        OrbitDistance {
             distance: MAX_ORBIT_DISTANCE,
-        }
+        },
     ));
 }
 
@@ -67,7 +67,8 @@ fn orbit(
 ) {
     let (mut camera_transform, orbit_distance) = camera.single_mut().unwrap();
     let target = player_transform.single().unwrap();
-    camera_transform.translation = target.translation - camera_transform.forward() * orbit_distance.distance;
+    camera_transform.translation =
+        target.translation - camera_transform.forward() * orbit_distance.distance;
 }
 
 fn camera_look(
@@ -97,11 +98,12 @@ fn orbit_range(
         match ev.unit {
             MouseScrollUnit::Line => {
                 if ev.y < 0.0 {
-                    orbit_distance.distance = f32::min(orbit_distance.distance + 1.0, MAX_ORBIT_DISTANCE);
+                    orbit_distance.distance =
+                        f32::min(orbit_distance.distance + 1.0, MAX_ORBIT_DISTANCE);
                 } else {
-                    orbit_distance.distance = f32::max(orbit_distance.distance - 1.0, MAX_ORBIT_DISTANCE / 3.);
+                    orbit_distance.distance =
+                        f32::max(orbit_distance.distance - 1.0, MAX_ORBIT_DISTANCE / 3.);
                 }
-
             }
             MouseScrollUnit::Pixel => {
                 //println!("Scroll (pixel units): vertical: {}, horizontal: {}", ev.y, ev.x);

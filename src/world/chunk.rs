@@ -36,7 +36,6 @@ impl VoxelMapping {
 pub const CHUNK_DIMENSION: u32 = 32;
 pub const CHUNK_DATA_SIZE: usize = (CHUNK_DIMENSION * CHUNK_DIMENSION * CHUNK_DIMENSION) as usize;
 
-
 #[derive(Component)]
 struct _ChunkCoord(IVec3);
 

@@ -1,9 +1,9 @@
-use bevy::prelude::*;
 use bevy::asset::RenderAssetUsages;
+use bevy::prelude::*;
 use bevy::render::mesh::Indices;
 use bevy::render::render_resource::PrimitiveTopology;
 
-use crate::world::{VoxelMapping, VoxelData, VoxelId, CHUNK_DIMENSION, CHUNK_DATA_SIZE}; 
+use crate::world::{CHUNK_DATA_SIZE, CHUNK_DIMENSION, VoxelData, VoxelId, VoxelMapping};
 
 pub struct WorldPlugin;
 impl Plugin for WorldPlugin {
@@ -18,7 +18,6 @@ pub struct VoxelResource {
     pub materials: Vec<Handle<StandardMaterial>>,
     pub mesh: Handle<Mesh>,
 }
-
 
 const VOXEL_SIZE: f32 = 1.0;
 
@@ -48,7 +47,6 @@ struct FaceParams {
     normal: Vec3,
     basis: Basis,
 }
-
 
 /// Contains face visibility data for each direction.
 /// Only contains 0 (air) and 1 (block), does not contain material info.
@@ -114,17 +112,20 @@ fn generate_no_padding_dumby_chunk() -> VoxelData {
                 if tx < CHUNK_DIMENSION && tz < CHUNK_DIMENSION {
                     let tower_dist = ((offset_x * offset_x + offset_z * offset_z) as f32).sqrt();
 
-                    if tower_dist <= TOWER_RADIUS as f32 && tower_dist >= (TOWER_RADIUS - 1) as f32 {
+                    if tower_dist <= TOWER_RADIUS as f32 && tower_dist >= (TOWER_RADIUS - 1) as f32
+                    {
                         chunk.set(tx, y, tz, VoxelId::Stone);
                     }
 
-                    if y == TOWER_HEIGHT - 1 && tower_dist <= TOWER_RADIUS as f32
-                        && (offset_x + offset_z) % 2 == 0 {
-                            chunk.set(tx, y, tz, VoxelId::Stone);
-                            if y + 1 < CHUNK_DIMENSION {
-                                chunk.set(tx, y + 1, tz, VoxelId::Stone);
-                            }
+                    if y == TOWER_HEIGHT - 1
+                        && tower_dist <= TOWER_RADIUS as f32
+                        && (offset_x + offset_z) % 2 == 0
+                    {
+                        chunk.set(tx, y, tz, VoxelId::Stone);
+                        if y + 1 < CHUNK_DIMENSION {
+                            chunk.set(tx, y + 1, tz, VoxelId::Stone);
                         }
+                    }
                 }
             }
         }
@@ -146,9 +147,6 @@ fn generate_no_padding_dumby_chunk() -> VoxelData {
     chunk
 }
 
-
-
-
 /// Returns XY (z-faces), ZY (x-faces), XZ (y-faces) plane views, leaving only faces.
 /// TODO: Shift to bit operations for face detection.
 fn chunk_view_generator(chunk: &VoxelData) -> ChunkViews {
@@ -163,9 +161,7 @@ fn chunk_view_generator(chunk: &VoxelData) -> ChunkViews {
     for x in 0..CHUNK_DIMENSION {
         for y in 0..CHUNK_DIMENSION {
             for z in 0..CHUNK_DIMENSION {
-                if chunk.get_id(x, y, z) != 0
-                    && (x == 0 || chunk.get_id(x - 1, y, z) == 0)
-                {
+                if chunk.get_id(x, y, z) != 0 && (x == 0 || chunk.get_id(x - 1, y, z) == 0) {
                     pos_x_faces[y as usize][z as usize] |= 1u32 << x;
                 }
             }
@@ -176,9 +172,7 @@ fn chunk_view_generator(chunk: &VoxelData) -> ChunkViews {
     for y in 0..CHUNK_DIMENSION {
         for x in 0..CHUNK_DIMENSION {
             for z in 0..CHUNK_DIMENSION {
-                if chunk.get_id(x, y, z) != 0
-                    && (y == 0 || chunk.get_id(x, y - 1, z) == 0)
-                {
+                if chunk.get_id(x, y, z) != 0 && (y == 0 || chunk.get_id(x, y - 1, z) == 0) {
                     pos_y_faces[z as usize][x as usize] |= 1u32 << y;
                 }
             }
@@ -189,9 +183,7 @@ fn chunk_view_generator(chunk: &VoxelData) -> ChunkViews {
     for z in 0..CHUNK_DIMENSION {
         for y in 0..CHUNK_DIMENSION {
             for x in 0..CHUNK_DIMENSION {
-                if chunk.get_id(x, y, z) != 0
-                    && (z == 0 || chunk.get_id(x, y, z - 1) == 0)
-                {
+                if chunk.get_id(x, y, z) != 0 && (z == 0 || chunk.get_id(x, y, z - 1) == 0) {
                     pos_z_faces[y as usize][x as usize] |= 1u32 << z;
                 }
             }
@@ -246,7 +238,6 @@ fn chunk_view_generator(chunk: &VoxelData) -> ChunkViews {
         neg_y_faces,
     }
 }
-
 
 /// Handles the position/vertice/indice addition for each view.
 fn emit_quads(
@@ -320,9 +311,21 @@ fn emit_quads(
 }
 
 fn get_voxel_position(curr_u: u32, curr_v: u32, basis: Basis, normal: Vec3, depth: u32) -> Vec3 {
-    let Vec3 { x: nx, y: ny, z: nz } = normal.abs();
-    let Vec3 { x: ux, y: uy, z: uz } = basis.u;
-    let Vec3 { x: vx, y: vy, z: vz } = basis.v;
+    let Vec3 {
+        x: nx,
+        y: ny,
+        z: nz,
+    } = normal.abs();
+    let Vec3 {
+        x: ux,
+        y: uy,
+        z: uz,
+    } = basis.u;
+    let Vec3 {
+        x: vx,
+        y: vy,
+        z: vz,
+    } = basis.v;
 
     Vec3::new(
         nx * depth as f32 + ux * curr_u as f32 + vx * curr_v as f32,
@@ -348,7 +351,13 @@ fn greedy_mesher(
                 let v_start = v;
 
                 // Get the initial voxel ID that we're trying to merge
-                let initial_pos = get_voxel_position(u_start, v_start, face_params.basis, face_params.normal, depth);
+                let initial_pos = get_voxel_position(
+                    u_start,
+                    v_start,
+                    face_params.basis,
+                    face_params.normal,
+                    depth,
+                );
                 let curr_id = chunk.get_id(
                     initial_pos.x as u32,
                     initial_pos.y as u32,
@@ -361,13 +370,18 @@ fn greedy_mesher(
                 let mut curr_v = v + 1;
 
                 // Expand in V direction, checking voxel ID matches
-                while curr_v < CHUNK_DIMENSION && ((face[u as usize][curr_v as usize] >> depth) & 1) == 1 {
-                    let check_pos = get_voxel_position(u_start, curr_v, face_params.basis, face_params.normal, depth);
-                    let check_id = chunk.get_id(
-                        check_pos.x as u32,
-                        check_pos.y as u32,
-                        check_pos.z as u32,
+                while curr_v < CHUNK_DIMENSION
+                    && ((face[u as usize][curr_v as usize] >> depth) & 1) == 1
+                {
+                    let check_pos = get_voxel_position(
+                        u_start,
+                        curr_v,
+                        face_params.basis,
+                        face_params.normal,
+                        depth,
                     );
+                    let check_id =
+                        chunk.get_id(check_pos.x as u32, check_pos.y as u32, check_pos.z as u32);
 
                     if check_id != curr_id {
                         break;
@@ -383,13 +397,19 @@ fn greedy_mesher(
 
                 // Expand in U direction, checking all voxels in the strip match
                 'outer: while curr_u < CHUNK_DIMENSION {
-                    for check_v in v..(v + v_dimension) { 
+                    for check_v in v..(v + v_dimension) {
                         if ((face[curr_u as usize][check_v as usize] >> depth) & 1) != 1 {
                             break 'outer;
                         }
 
                         // Check voxel ID matches
-                        let check_pos = get_voxel_position(curr_u, check_v, face_params.basis, face_params.normal, depth);
+                        let check_pos = get_voxel_position(
+                            curr_u,
+                            check_v,
+                            face_params.basis,
+                            face_params.normal,
+                            depth,
+                        );
                         let check_id = chunk.get_id(
                             check_pos.x as u32,
                             check_pos.y as u32,
@@ -427,8 +447,6 @@ fn greedy_mesher(
         }
     }
 }
-
-
 
 fn generate_mesh(
     chunk_views: &mut ChunkViews,
@@ -514,7 +532,10 @@ fn generate_mesh(
         }
     }
 
-    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
+    let mut mesh = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::default(),
+    );
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vertex_buffer);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normal_buffer);
     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colour_buffer);
@@ -548,4 +569,3 @@ fn setup(
         }
     }
 }
-
