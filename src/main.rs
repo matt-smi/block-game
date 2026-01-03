@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use game::common::{GameState, InputPlugin};
 use game::plugins::*;
 use game::ui::UiPlugin;
-use game::world::*; 
+use game::world::WorldPlugin;
 
 fn main() {
     App::new()

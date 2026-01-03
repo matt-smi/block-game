@@ -3,7 +3,6 @@ use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 
 use crate::common::*;
-use crate::world::{VoxelResource};
 
 const INIT_VELOCITY: Vec3 = Vec3::ZERO;
 const PLAYER_SPEED: f32 = 15.0;
