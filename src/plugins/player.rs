@@ -3,7 +3,6 @@ use leafwing_input_manager::prelude::*;
 
 use crate::common::*;
 use crate::plugins::movement::Velocity;
-use crate::world::VoxelResource;
 //use crate::world::init_resources;
 
 const INIT_VELOCITY: Vec3 = Vec3::ZERO;
