@@ -4,7 +4,7 @@ use leafwing_input_manager::prelude::*;
 use crate::common::*;
 use crate::plugins::movement::Velocity;
 use crate::world::VoxelResource;
-use crate::world::init_resources;
+//use crate::world::init_resources;
 
 const INIT_VELOCITY: Vec3 = Vec3::ZERO;
 const PLAYER_SPEED: f32 = 15.0;
@@ -28,7 +28,7 @@ struct Angles2D {
 pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_player.after(init_resources))
+        app.add_systems(Startup, spawn_player) //after(init_resources))
             .add_systems(
                 Update,
                 (player_look, player_move).run_if(in_state(GameState::Playing)),
@@ -36,10 +36,21 @@ impl Plugin for PlayerPlugin {
     }
 }
 
-fn spawn_player(mut commands: Commands, voxel: Res<VoxelResource>) {
+fn spawn_player(mut commands: Commands,  mut meshes: ResMut<Assets<Mesh>>, mut materials: ResMut<Assets<StandardMaterial>>,) {
+    let body = meshes.add(Cuboid::new(
+        2. * PLAYER_SCALE,
+        4. * PLAYER_SCALE,
+        2. * PLAYER_SCALE,
+    ));
+
+    let handle = materials.add(StandardMaterial {
+        base_color: Color::WHITE,
+        ..default()
+    });
+
     commands.spawn((
-        Mesh3d(voxel.mesh.clone()),
-        MeshMaterial3d(voxel.materials[0].clone()),
+        Mesh3d(body),
+        MeshMaterial3d(handle),
         Transform {
             scale: Vec3::new(PLAYER_SCALE, PLAYER_SCALE, PLAYER_SCALE),
             ..default()

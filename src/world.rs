@@ -1,4 +1,5 @@
 pub mod chunk;
-mod setup;
+pub mod setup;
 
 pub use setup::*;
+pub use chunk::*;
