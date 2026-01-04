@@ -1,6 +1,13 @@
 use bevy::prelude::*;
 
 use crate::common::GameState;
+use crate::plugins::camera::Angles2D; 
+
+pub type Movement = (
+    &'static mut Transform,
+    &'static mut Velocity,
+    &'static mut Angles2D,
+);
 
 pub struct MovementPlugin;
 
@@ -20,3 +27,5 @@ pub fn update_position(mut query: Query<(&Velocity, &mut Transform)>, time: Res<
         transform.translation += time.delta_secs() * velocity.value;
     }
 }
+
+

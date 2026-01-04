@@ -8,6 +8,13 @@ use crate::plugins::player::Player;
 const ORBIT_DISTANCE: f32 = 10.0;
 
 #[derive(Component)]
+pub struct Angles2D {
+    pub yaw: f32,
+    pub pitch: f32,
+}
+
+
+#[derive(Component)]
 pub struct CameraPlugin;
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {

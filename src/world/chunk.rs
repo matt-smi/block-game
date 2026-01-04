@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{platform::collections::HashMap, prelude::*};
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -80,4 +80,19 @@ impl VoxelData {
 #[derive(Component)]
 pub struct ChunkMesh {
     pub handle: Handle<Mesh>,
+}
+
+/* 
+    Chunk key is indexed by chunk position. E.g <-2, 0, 10> -> <-2 * CHUNK_SIZE, 0 * CHUNK_SIZE, 10 * CHUNK_SIZE> (world position). 
+    Also note Y is not used, since the value represents the column at the x, z coordinates.
+    Leaving y in here if we want to support chunk layering later on. 
+*/
+#[derive(Resource)]
+pub struct ChunkEntities {
+    pub chunks: HashMap<IVec3, Vec<Entity>>,
+}
+
+#[derive(Resource)]
+pub struct LastChunk { 
+    pub chunkPos: IVec3, 
 }

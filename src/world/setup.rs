@@ -1,15 +1,19 @@
 use bevy::asset::RenderAssetUsages;
+use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use bevy::render::mesh::Indices;
 use bevy::render::render_resource::PrimitiveTopology;
 
-use crate::world::{CHUNK_DATA_SIZE, CHUNK_DIMENSION, VoxelData, VoxelId, VoxelMapping};
+use crate::world::*;
 
 pub struct WorldPlugin;
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(VoxelMapping::new());
-        app.add_systems(Startup, setup);
+        app.insert_resource(ChunkEntities {
+            chunks: HashMap::new(),
+        });
+        //app.add_systems(Startup, setup);
     }
 }
 
@@ -51,7 +55,7 @@ struct FaceParams {
 /// Contains face visibility data for each direction.
 /// Only contains 0 (air) and 1 (block), does not contain material info.
 /// Used for meshing.
-struct ChunkViews {
+pub struct ChunkViews {
     pos_x_faces: [[u32; CHUNK_DIMENSION as usize]; CHUNK_DIMENSION as usize],
     pos_z_faces: [[u32; CHUNK_DIMENSION as usize]; CHUNK_DIMENSION as usize],
     pos_y_faces: [[u32; CHUNK_DIMENSION as usize]; CHUNK_DIMENSION as usize],
@@ -61,7 +65,7 @@ struct ChunkViews {
 }
 
 // Just a random chunk to test renderer.
-fn generate_no_padding_dumby_chunk() -> VoxelData {
+pub fn generate_no_padding_dumby_chunk() -> VoxelData {
     let voxels = vec![VoxelId::Air; CHUNK_DATA_SIZE];
     let mut chunk = VoxelData {
         voxels,
@@ -149,7 +153,7 @@ fn generate_no_padding_dumby_chunk() -> VoxelData {
 
 /// Returns XY (z-faces), ZY (x-faces), XZ (y-faces) plane views, leaving only faces.
 /// TODO: Shift to bit operations for face detection.
-fn chunk_view_generator(chunk: &VoxelData) -> ChunkViews {
+pub fn chunk_view_generator(chunk: &VoxelData) -> ChunkViews {
     let mut pos_x_faces = [[0u32; CHUNK_DIMENSION as usize]; CHUNK_DIMENSION as usize]; // z, y
     let mut pos_z_faces = [[0u32; CHUNK_DIMENSION as usize]; CHUNK_DIMENSION as usize]; // x, y
     let mut pos_y_faces = [[0u32; CHUNK_DIMENSION as usize]; CHUNK_DIMENSION as usize]; // x, z
@@ -448,7 +452,7 @@ fn greedy_mesher(
     }
 }
 
-fn generate_mesh(
+pub fn generate_mesh(
     chunk_views: &mut ChunkViews,
     mapping: &Res<VoxelMapping>,
     chunk: &VoxelData,
@@ -549,14 +553,15 @@ fn setup(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mapping: Res<VoxelMapping>,
+    mut chunk_entities: ResMut<ChunkEntities>,
 ) {
     let interior_chunk = generate_no_padding_dumby_chunk();
-    for x in 0..50 {
-        for z in 0..50 {
+    for x in 0..32 {
+        for z in 0..32 {
             let mut chunk_views = chunk_view_generator(&interior_chunk);
 
             if let Some(mesh) = generate_mesh(&mut chunk_views, &mapping, &interior_chunk) {
-                commands.spawn((
+                let entity = commands.spawn((
                     Mesh3d(meshes.add(mesh)),
                     MeshMaterial3d(materials.add(StandardMaterial {
                         base_color: Color::srgb(1.0, 1.0, 1.0),
@@ -564,7 +569,9 @@ fn setup(
                     })),
                     Transform::from_xyz(16.0 * x as f32, 0.0, 16.0 * z as f32)
                         .with_scale(Vec3::splat(0.5)),
-                ));
+                )).id();
+
+                chunk_entities.chunks.insert(IVec3::new(x, 0, z), vec![entity]);
             }
         }
     }
