@@ -1,66 +1,77 @@
-use bevy::{platform::collections::HashMap, prelude::*};
-use leafwing_input_manager::prelude::ActionState;
-
-use crate::common::GameAction;
+use bevy::prelude::*;
 use crate::plugins::{movement::Movement, player::Player};
 use crate::common::GameState;
 use crate::world::{ChunkEntities, LastChunk, VoxelMapping, chunk_view_generator, generate_mesh, generate_no_padding_dumby_chunk}; 
 
-const CHUNK_LOAD_DISTANCE: i32 = 16;
+const CHUNK_LOAD_DISTANCE: i32 = 50;
 
 pub struct ChunkHandlerPlugin; 
-//after(init_resources)) and player spawn.
 impl Plugin for ChunkHandlerPlugin { 
     fn build(&self, app: &mut App) {
         app.add_systems(
                 Update,
-                (update_chunk).run_if(in_state(GameState::Playing)), //add systems separately with guard in condition
+                (
+                    prune_chunks.run_if(in_state(GameState::Playing).and(chunk_changed)),
+                    load_chunks.run_if(chunk_changed),            //.after(prune_chunks),
+                ),
             );
+        app.add_systems(
+            PostUpdate, 
+        update_last_chunk);
+        
     }
 }
 
-fn update_chunk(single: Single<Movement, With<Player>>, mut chunk_entities: ResMut<ChunkEntities>, last_chunk: Option<ResMut<LastChunk>>, mut commands: Commands, mapping: Res<VoxelMapping>,  mut materials: ResMut<Assets<StandardMaterial>>,
-    mut meshes: ResMut<Assets<Mesh>>){
-    let (transform, _, _) = single.into_inner(); 
-    let player_position = transform.translation; 
-    let curr_chunk = IVec3::new((player_position.x / 16.0).floor() as i32, 0, (player_position.z / 16.0).floor() as i32);
-    if let Some(last_chunk) = last_chunk {
-        println!("{:?}", last_chunk.chunkPos);
+fn chunk_changed(player: Single<&Transform, With<Player>>, last_chunk: Option<Res<LastChunk>>) -> bool { 
+    let player_position = player.translation;
+    let curr_chunk = get_chunk_index(player_position);
+
+     if let Some(last_chunk) = last_chunk {
         if curr_chunk == last_chunk.chunkPos { 
-            return;
+            return false;
         }
     }
-
-    prune_chunks(curr_chunk, &mut chunk_entities.chunks);
-    load_chunks(curr_chunk, &mut chunk_entities.chunks, commands, mapping, materials, meshes);    
+    return true 
 }
 
-
-
-fn prune_chunks(curr_chunk: IVec3, chunk_entities: &mut HashMap<IVec3, Vec<Entity>>){ 
-    //check entites that arent in use
-    chunk_entities.retain(|key, value| { 
-        (curr_chunk.x - key.x).pow(2) + (curr_chunk.z - key.z).pow(2) <= CHUNK_LOAD_DISTANCE.pow(2)
+//curr_chunk: IVec3, chunk_entities: &mut HashMap<IVec3, Vec<Entity>>, 
+fn prune_chunks(single: Single<Movement, With<Player>>, mut chunk_entities: ResMut<ChunkEntities>, last_chunk: Option<ResMut<LastChunk>>, mut commands: Commands){ 
+    
+    let (transform, _, _) = single.into_inner(); 
+    let curr_chunk = get_chunk_index(transform.translation);
+    
+    println!("Chunks in view {:?}", chunk_entities.chunks.len());
+    chunk_entities.chunks.retain(|key, entities| { 
+        let in_bounds = (curr_chunk.x - key.x).pow(2) + (curr_chunk.z - key.z).pow(2) <= CHUNK_LOAD_DISTANCE.pow(2); 
+        if !in_bounds { 
+            for entity in entities { 
+                commands.entity(*entity).despawn();
+            }
+        }
+        in_bounds
     });
 }
 
 
-//pass in cache as second argument.
-// replace set-up.
-fn load_chunks(curr_chunk: IVec3, mut chunk_entities: &mut HashMap<IVec3, Vec<Entity>>, mut commands: Commands, mapping: Res<VoxelMapping>, mut materials: ResMut<Assets<StandardMaterial>>,
-    mut meshes: ResMut<Assets<Mesh>>){ 
+fn load_chunks(single: Single<Movement, With<Player>>, mapping: Res<VoxelMapping>, mut materials: ResMut<Assets<StandardMaterial>>,
+    mut meshes: ResMut<Assets<Mesh>>, mut chunk_entities: ResMut<ChunkEntities>, mut commands: Commands){ 
+
+    let (transform, _, _) = single.into_inner(); 
+    let curr_chunk = get_chunk_index(transform.translation);
    
     for x in -CHUNK_LOAD_DISTANCE..(CHUNK_LOAD_DISTANCE + 1) {for z in -CHUNK_LOAD_DISTANCE..(CHUNK_LOAD_DISTANCE + 1) {
-        let new_chunk_pos = IVec3::new(curr_chunk.x + x, 0, curr_chunk.z + curr_chunk.z); 
-        if chunk_entities.contains_key(&new_chunk_pos) { 
+        let new_chunk_pos = IVec3::new(curr_chunk.x + x, 0, curr_chunk.z + z); 
+        if chunk_entities.chunks.contains_key(&new_chunk_pos) { 
+            println!("continuing");
             continue; 
         }
-
+        println!("generating at {:?}", Vec3::new(16.0 * new_chunk_pos.x as f32, 0.0, 16.0 * new_chunk_pos.z as f32));
+        
         let interior_chunk = generate_no_padding_dumby_chunk();
    
         let mut chunk_views = chunk_view_generator(&interior_chunk);
 
-        if let Some(mesh) = generate_mesh(&mut chunk_views, &mapping, &interior_chunk) {
+        if let Some(mesh) = generate_mesh(&mut chunk_views, &mapping, &interior_chunk) { 
             let entity = commands.spawn((
                 Mesh3d(meshes.add(mesh)),
                 MeshMaterial3d(materials.add(StandardMaterial {
@@ -71,14 +82,24 @@ fn load_chunks(curr_chunk: IVec3, mut chunk_entities: &mut HashMap<IVec3, Vec<En
                     .with_scale(Vec3::splat(0.5)),
             )).id();
 
-            chunk_entities.insert(IVec3::new(x, 0, z), vec![entity]);
+            chunk_entities.chunks.insert(new_chunk_pos, vec![entity]);
         }
 
-    }
-     commands.insert_resource(LastChunk { 
-        chunkPos: curr_chunk,
-    });
-    }
+    }}
+
+    
 }
 
+fn update_last_chunk(player: Single<&Transform, With<Player>>, mut commands: Commands) { 
+    let curr_chunk = get_chunk_index(player.translation);
+    commands.insert_resource(LastChunk { 
+        chunkPos: curr_chunk,
+    });
+}
+
+
+
+fn get_chunk_index(world_position: Vec3) -> IVec3 { 
+    IVec3::new((world_position.x / 16.0).floor() as i32, 0, (world_position.z / 16.0).floor() as i32)
+}
 
