@@ -9,7 +9,6 @@ use crate::world::*;
 pub struct WorldPlugin;
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(VoxelMapping::new());
         app.insert_resource(ChunkEntities {
             chunks: HashMap::new(),
         });
@@ -344,7 +343,6 @@ fn greedy_mesher(
     face: &mut [[u32; CHUNK_DIMENSION as usize]; CHUNK_DIMENSION as usize],
     buffers: &mut MeshBuffers,
     face_params: FaceParams,
-    voxel_mapping: &Res<VoxelMapping>,
     chunk: &VoxelData,
 ) {
     for u in 0..CHUNK_DIMENSION {
@@ -433,7 +431,7 @@ fn greedy_mesher(
                     curr_u += 1;
                 }
 
-                let colour = voxel_mapping.colours[curr_id as usize];
+                let colour = VOXEL_MAPPING.colours[curr_id as usize];
                 emit_quads(
                     buffers,
                     QuadParams {
@@ -454,7 +452,6 @@ fn greedy_mesher(
 
 pub fn generate_mesh(
     chunk_views: &mut ChunkViews,
-    mapping: &Res<VoxelMapping>,
     chunk: &VoxelData,
 ) -> Option<Mesh> {
     let mut base_idx = 0u16;
@@ -528,7 +525,6 @@ pub fn generate_mesh(
             face,
             &mut buffers,
             FaceParams { normal, basis },
-            mapping,
             chunk,
         );
         if buffers.vertices.is_empty() {
@@ -552,7 +548,7 @@ fn setup(
     mut commands: Commands,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mapping: Res<VoxelMapping>,
+    mapping: VoxelMapping,
     mut chunk_entities: ResMut<ChunkEntities>,
 ) {
     let interior_chunk = generate_no_padding_dumby_chunk();
@@ -560,7 +556,7 @@ fn setup(
         for z in 0..32 {
             let mut chunk_views = chunk_view_generator(&interior_chunk);
 
-            if let Some(mesh) = generate_mesh(&mut chunk_views, &mapping, &interior_chunk) {
+            if let Some(mesh) = generate_mesh(&mut chunk_views, &interior_chunk) {
                 let entity = commands.spawn((
                     Mesh3d(meshes.add(mesh)),
                     MeshMaterial3d(materials.add(StandardMaterial {

@@ -10,7 +10,7 @@ fn main() {
             primary_window: Some(Window {
                 title: "Voxel Game".into(),
                 name: Some("game.app".into()),
-                present_mode: bevy::window::PresentMode::AutoNoVsync,
+                present_mode: bevy::window::PresentMode::Immediate,
                 ..default()
             }),
             ..default()
