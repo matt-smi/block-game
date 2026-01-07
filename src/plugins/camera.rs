@@ -13,7 +13,6 @@ pub struct Angles2D {
     pub pitch: f32,
 }
 
-
 #[derive(Component)]
 pub struct CameraPlugin;
 impl Plugin for CameraPlugin {

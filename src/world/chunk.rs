@@ -2,7 +2,6 @@ use bevy::{platform::collections::HashMap, prelude::*};
 use std::sync::Mutex;
 use std::sync::mpsc::{Receiver, Sender};
 
-
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VoxelId {
@@ -12,18 +11,17 @@ pub enum VoxelId {
     Stone = 3,
 }
 
-
 pub struct VoxelMapping {
     pub colours: [[f32; 4]; 4],
 }
 
 pub const VOXEL_MAPPING: VoxelMapping = VoxelMapping {
     colours: [
-                [1.0, 1.0, 1.0, 1.0], // Air (dummy values)
-                [0.5, 0.3, 0.2, 1.0], // Dirt
-                [0.2, 0.8, 0.2, 1.0], // Grass
-                [0.6, 0.6, 0.6, 1.0], // Stone
-            ],
+        [1.0, 1.0, 1.0, 1.0], // Air (dummy values)
+        [0.5, 0.3, 0.2, 1.0], // Dirt
+        [0.2, 0.8, 0.2, 1.0], // Grass
+        [0.6, 0.6, 0.6, 1.0], // Stone
+    ],
 };
 
 pub const CHUNK_DIMENSION: u32 = 32;
@@ -75,10 +73,10 @@ pub struct ChunkMesh {
     pub handle: Handle<Mesh>,
 }
 
-/* 
-    Chunk key is indexed by chunk position. E.g <-2, 0, 10> -> <-2 * CHUNK_SIZE, 0 * CHUNK_SIZE, 10 * CHUNK_SIZE> (world position). 
+/*
+    Chunk key is indexed by chunk position. E.g <-2, 0, 10> -> <-2 * CHUNK_SIZE, 0 * CHUNK_SIZE, 10 * CHUNK_SIZE> (world position).
     Also note Y is not used, since the value represents the column at the x, z coordinates.
-    Leaving y in here if we want to support chunk layering later on. 
+    Leaving y in here if we want to support chunk layering later on.
     (TODO: make this a 2D linked-list so it's easier to scan boundary, or introduce some sort of sorting)
 */
 #[derive(Resource)]
@@ -87,12 +85,12 @@ pub struct ChunkEntities {
 }
 
 #[derive(Resource)]
-pub struct LastChunk { 
-    pub chunkPos: IVec3, 
+pub struct LastChunk {
+    pub chunk_pos: IVec3,
 }
 
 #[derive(Resource)]
-pub struct ChunkChannel { 
-    pub sender: Sender<(IVec3, Mesh)>,  
-    pub receiver: Mutex<Receiver<(IVec3, Mesh)>>, 
+pub struct ChunkChannel {
+    pub sender: Sender<(IVec3, Mesh)>,
+    pub receiver: Mutex<Receiver<(IVec3, Mesh)>>,
 }

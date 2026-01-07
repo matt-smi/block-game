@@ -6,13 +6,14 @@ use bevy::render::render_resource::PrimitiveTopology;
 
 use crate::world::*;
 
+// TODO: Add chunk exterior face pruning
+
 pub struct WorldPlugin;
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(ChunkEntities {
             chunks: HashMap::new(),
         });
-        //app.add_systems(Startup, setup);
     }
 }
 
@@ -450,10 +451,7 @@ fn greedy_mesher(
     }
 }
 
-pub fn generate_mesh(
-    chunk_views: &mut ChunkViews,
-    chunk: &VoxelData,
-) -> Option<Mesh> {
+pub fn generate_mesh(chunk_views: &mut ChunkViews, chunk: &VoxelData) -> Option<Mesh> {
     let mut base_idx = 0u16;
     let mut vertex_buffer = Vec::new();
     let mut index_buffer = Vec::new();
@@ -521,12 +519,7 @@ pub fn generate_mesh(
     };
 
     for (face, normal, basis) in faces {
-        greedy_mesher(
-            face,
-            &mut buffers,
-            FaceParams { normal, basis },
-            chunk,
-        );
+        greedy_mesher(face, &mut buffers, FaceParams { normal, basis }, chunk);
         if buffers.vertices.is_empty() {
             return None;
         }
@@ -542,33 +535,4 @@ pub fn generate_mesh(
     mesh.insert_indices(Indices::U16(index_buffer));
 
     Some(mesh)
-}
-
-fn setup(
-    mut commands: Commands,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mapping: VoxelMapping,
-    mut chunk_entities: ResMut<ChunkEntities>,
-) {
-    let interior_chunk = generate_no_padding_dumby_chunk();
-    for x in 0..32 {
-        for z in 0..32 {
-            let mut chunk_views = chunk_view_generator(&interior_chunk);
-
-            if let Some(mesh) = generate_mesh(&mut chunk_views, &interior_chunk) {
-                let entity = commands.spawn((
-                    Mesh3d(meshes.add(mesh)),
-                    MeshMaterial3d(materials.add(StandardMaterial {
-                        base_color: Color::srgb(1.0, 1.0, 1.0),
-                        ..default()
-                    })),
-                    Transform::from_xyz(16.0 * x as f32, 0.0, 16.0 * z as f32)
-                        .with_scale(Vec3::splat(0.5)),
-                )).id();
-
-                chunk_entities.chunks.insert(IVec3::new(x, 0, z), vec![entity]);
-            }
-        }
-    }
 }
