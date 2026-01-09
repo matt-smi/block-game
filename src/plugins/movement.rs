@@ -1,6 +1,13 @@
 use bevy::prelude::*;
 
 use crate::common::GameState;
+use crate::plugins::camera::Angles2D;
+
+pub type Movement = (
+    &'static mut Transform,
+    &'static mut Velocity,
+    &'static mut Angles2D,
+);
 
 pub struct MovementPlugin;
 

@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use game::common::{GameState, InputPlugin};
 use game::plugins::*;
 use game::ui::UiPlugin;
-use game::world::WorldPlugin;
+use game::world::{ChunkHandlerPlugin, WorldPlugin};
 
 fn main() {
     App::new()
@@ -10,7 +10,7 @@ fn main() {
             primary_window: Some(Window {
                 title: "Voxel Game".into(),
                 name: Some("game.app".into()),
-                present_mode: bevy::window::PresentMode::AutoNoVsync,
+                present_mode: bevy::window::PresentMode::Immediate,
                 ..default()
             }),
             ..default()
@@ -25,6 +25,7 @@ fn main() {
         .add_plugins(PlayerPlugin)
         .add_plugins(MovementPlugin)
         .add_plugins(CameraPlugin)
+        .add_plugins(ChunkHandlerPlugin)
         .run();
     println!("Program finished running.");
 }
