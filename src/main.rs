@@ -1,4 +1,5 @@
 use avian3d::PhysicsPlugins;
+use avian3d::prelude::PhysicsDebugPlugin;
 use bevy::prelude::*;
 use game::common::{GameState, InputPlugin};
 use game::plugins::*;
@@ -16,7 +17,7 @@ fn main() {
             }),
             ..default()
         }))
-        .add_plugins(PhysicsPlugins::default())
+       .add_plugins(PhysicsPlugins::default().build())
         .add_plugins(InputPlugin)
         .add_plugins(DebugPlugin {
             should_print: false,
@@ -25,7 +26,6 @@ fn main() {
         .add_plugins(WorldPlugin)
         .add_plugins(UiPlugin)
         .add_plugins(PlayerPlugin)
-        .add_plugins(MovementPlugin)
         .add_plugins(CameraPlugin)
         .add_plugins(ChunkHandlerPlugin)
         .run();
