@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy::window::CursorGrabMode;
+use bevy::window::{CursorGrabMode, CursorOptions};
 
 use crate::common::GameState;
 use crate::plugins::movement::update_position;
@@ -35,17 +35,21 @@ fn setup(mut commands: Commands) {
         Transform::from_xyz(5.0, 5.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
 }
-
-fn lock_cursor(mut windows: Query<&mut Window>) {
-    let mut window = windows.single_mut().unwrap();
-    window.cursor_options.grab_mode = CursorGrabMode::Locked;
-    window.cursor_options.visible = false;
+//mut windows: Query<&mut Window>
+fn lock_cursor(mut cursor_options: Query<&mut CursorOptions>) {
+    //let mut window = windows.single_mut();
+    let mut cursor_options = cursor_options.single_mut().unwrap();
+    cursor_options.grab_mode = CursorGrabMode::Locked;
+    cursor_options.visible = false;
 }
 
-fn unlock_cursor(mut windows: Query<&mut Window>) {
-    let mut window = windows.single_mut().unwrap();
-    window.cursor_options.grab_mode = CursorGrabMode::None;
-    window.cursor_options.visible = true;
+fn unlock_cursor(mut cursor_options: Query<&mut CursorOptions>) {
+    let mut cursor_options = cursor_options.single_mut().unwrap();
+    cursor_options.grab_mode = CursorGrabMode::None;
+    cursor_options.visible = true;
+    // let mut window = windows.single_mut().unwrap();
+    // window.cursor_options.grab_mode = CursorGrabMode::None;
+    // window.cursor_options.visible = true;
 }
 
 fn orbit(

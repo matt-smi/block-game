@@ -73,7 +73,7 @@ impl Plugin for MainMenu {
     }
 }
 fn main_menu(
-    mut exit: EventWriter<AppExit>,
+    mut exit: MessageWriter<AppExit>,
     mut next_state: ResMut<NextState<GameState>>,
     mut next_menu_state: ResMut<NextState<MenuState>>,
     mut query: Query<(&Interaction, &MenuButtonAction), ButtonInteraction>,

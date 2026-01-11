@@ -4,7 +4,6 @@ use leafwing_input_manager::prelude::*;
 use crate::common::*;
 use crate::plugins::camera::Angles2D;
 use crate::plugins::movement::*;
-//use crate::world::init_resources;
 
 const INIT_VELOCITY: Vec3 = Vec3::ZERO;
 const PLAYER_SPEED: f32 = 15.0;
@@ -16,11 +15,10 @@ pub struct Player;
 pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_player) //after(init_resources))
-            .add_systems(
-                Update,
-                (player_look, player_move).run_if(in_state(GameState::Playing)),
-            );
+        app.add_systems(Startup, spawn_player).add_systems(
+            Update,
+            (player_look, player_move).run_if(in_state(GameState::Playing)),
+        );
     }
 }
 
@@ -85,6 +83,4 @@ fn player_move(single: Single<(Movement, &ActionState<GameAction>), With<Player>
     direction += vert * Vec3::Y;
 
     velocity.value = direction.normalize_or_zero() * PLAYER_SPEED;
-
-    // println!("Player position :{:?}", transform.translation);
 }

@@ -18,7 +18,7 @@ pub fn button(label: &str) -> impl Bundle {
         },
         Button,
         BackgroundColor(Color::BLACK),
-        BorderColor(Color::WHITE),
+        BorderColor::all(Color::WHITE),
         BorderRadius::MAX,
         children![(
             Text::new(label),

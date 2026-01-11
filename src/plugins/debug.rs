@@ -1,4 +1,4 @@
-use bevy::dev_tools::fps_overlay::{FpsOverlayConfig, FpsOverlayPlugin};
+use bevy::dev_tools::fps_overlay::{FpsOverlayConfig, FpsOverlayPlugin, FrameTimeGraphConfig};
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::ActionState;
 
@@ -21,6 +21,11 @@ impl Plugin for DebugPlugin {
                 text_color: Color::WHITE,
                 enabled: true,
                 refresh_interval: core::time::Duration::from_millis(100),
+                frame_time_graph_config: FrameTimeGraphConfig {
+                    enabled: true,
+                    min_fps: 60.,
+                    target_fps: 120.,
+                },
             },
         });
         app.add_systems(Update, toggle_fps);

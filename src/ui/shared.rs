@@ -67,19 +67,19 @@ fn button_system(
             Interaction::Pressed => {
                 input_focus.set(entity);
                 *color = PRESSED_BUTTON.into();
-                *border_color = BorderColor(RED);
+                *border_color = BorderColor::all(RED);
                 button.set_changed();
             }
             Interaction::Hovered => {
                 input_focus.set(entity);
                 *color = HOVERED_BUTTON.into();
-                *border_color = BorderColor(Color::WHITE);
+                *border_color = BorderColor::all(Color::WHITE);
                 button.set_changed();
             }
             Interaction::None => {
                 input_focus.clear();
                 *color = NORMAL_BUTTON.into();
-                *border_color = BorderColor(Color::WHITE);
+                *border_color = BorderColor::all(Color::WHITE);
             }
         }
     }
