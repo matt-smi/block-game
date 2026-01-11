@@ -529,7 +529,6 @@ pub fn generate_mesh(chunk_views: &mut ChunkViews, chunk: &VoxelData) -> Option<
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vertex_buffer);
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normal_buffer);
     mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colour_buffer);
-    //  mesh.with_inserted_indices(Indices::U16(index_buffer))
     mesh.insert_indices(Indices::U16(index_buffer));
 
     Some(mesh)
