@@ -27,7 +27,7 @@ fn main() {
         .add_plugins(WorldPlugin)
         .add_plugins(UiPlugin)
         .add_plugins(PlayerPlugin)
-        .add_plugins(PhysicsDebugPlugin) //uncomment for collider visuals
+        //.add_plugins(PhysicsDebugPlugin) //uncomment for collider visuals
         .add_plugins(CameraPlugin)
         .add_plugins(ChunkHandlerPlugin)
         .add_plugins(ChunkColliderPlugin)
