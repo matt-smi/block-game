@@ -53,7 +53,7 @@ fn unlock_cursor(mut cursor_options: Query<&mut CursorOptions>) {
 
 fn orbit(
     mut camera: Single<&mut Transform, With<Camera>>,
-    player_transform: Query<&Transform, (With<Player>, Without<Camera>)>,
+player_transform: Query<&Transform, (With<Player>, Without<Camera>)>,
 ) {
     let target = player_transform.single().unwrap();
     camera.translation = target.translation - camera.forward() * ORBIT_DISTANCE;

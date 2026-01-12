@@ -7,5 +7,3 @@ pub type Movement = (
     &'static mut LinearVelocity,
     &'static mut Angles2D,
 );
-
-pub struct MovementPlugin;

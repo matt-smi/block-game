@@ -11,7 +11,7 @@ use bevy::tasks::AsyncComputeTaskPool;
 use std::sync::Mutex;
 use std::sync::mpsc::channel;
 
-const CHUNK_LOAD_DISTANCE: i32 = 16;
+const CHUNK_LOAD_DISTANCE: i32 = 2;
 
 // TODO: Look into using commandQueue instead of mpsc:channel.
 pub struct ChunkHandlerPlugin;
@@ -128,8 +128,8 @@ fn process_chunk_meshes(
     // Process all completed chunks this frame
     while let Ok((chunk_pos, mesh)) = rx.try_recv() {
 
-          let collider = Collider::voxelized_trimesh_from_mesh(&mesh, 0.5, FillMode::SurfaceOnly)
-        .expect("Failed to create collider from mesh");
+        //   let collider = Collider::voxelized_trimesh_from_mesh(&mesh, 0.5, FillMode::SurfaceOnly)
+        // .expect("Failed to create collider from mesh");
     
         let entity = commands
             .spawn((
@@ -140,7 +140,7 @@ fn process_chunk_meshes(
                 })),
                 Transform::from_xyz(16.0 * chunk_pos.x as f32, 0.0, 16.0 * chunk_pos.z as f32),
                 RigidBody::Static, 
-                collider,
+                //collider,
             ))
             .id();
 
@@ -155,7 +155,7 @@ fn update_last_chunk(player: Single<&Transform, With<Player>>, mut commands: Com
     });
 }
 
-fn get_chunk_index(world_position: Vec3) -> IVec3 {
+pub fn get_chunk_index(world_position: Vec3) -> IVec3 {
     IVec3::new(
         (world_position.x / 16.0).floor() as i32,
         0,

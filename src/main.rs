@@ -5,6 +5,7 @@ use game::common::{GameState, InputPlugin};
 use game::plugins::*;
 use game::ui::UiPlugin;
 use game::world::{ChunkHandlerPlugin, WorldPlugin};
+use game::colliders::{ChunkColliderPlugin};
 
 fn main() {
     App::new()
@@ -26,8 +27,10 @@ fn main() {
         .add_plugins(WorldPlugin)
         .add_plugins(UiPlugin)
         .add_plugins(PlayerPlugin)
+        .add_plugins(PhysicsDebugPlugin)
         .add_plugins(CameraPlugin)
         .add_plugins(ChunkHandlerPlugin)
+        .add_plugins(ChunkColliderPlugin)
         .run();
     println!("Program finished running.");
 }
