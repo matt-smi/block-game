@@ -2,6 +2,7 @@ use avian3d::prelude::*;
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 
+use crate::colliders::collider_handler::Layers;
 use crate::common::*;
 use crate::plugins::camera::Angles2D;
 use crate::plugins::movement::*;
@@ -54,6 +55,7 @@ fn spawn_player(
         RigidBody::Dynamic,
         LinearVelocity::default(),
         Collider::capsule(PLAYER_SCALE * 1.1, PLAYER_SCALE * 1.8),
+        CollisionLayers::new([Layers::Player], [Layers::Terrain]),
         default_game_action_map(),
     ));
 }
@@ -82,26 +84,3 @@ fn player_move(single: Single<(Movement, &ActionState<GameAction>), With<Player>
     linear_velocity.x = horizontal.x;
     linear_velocity.z = horizontal.z;
 }
-
-// fn player_move(
-//     mut query: Query<(&mut LinearVelocity, &Angles2D), With<Player>>,
-//     action_state: Option<Res<ActionState<GameAction>>>, // Adjust based on your input system
-// ) {
-//     for (mut velocity, angles) in &mut query {
-//         if let Some(action_state) = action_state {
-//             let mut direction = Vec3::ZERO;
-//             let yaw_rot = Quat::from_rotation_y(angles.yaw);
-
-//             // Horizontal direction handling
-//             let hori = action_state.clamped_axis_pair(&GameAction::MoveHorizontal);
-//             direction += hori.x * (yaw_rot * Vec3::X).normalize();
-//             direction += hori.y * -(yaw_rot * Vec3::Z).normalize();
-
-//             // Set horizontal velocity (preserve vertical for gravity/jumping)
-//             let horizontal = direction.normalize_or_zero() * PLAYER_SPEED;
-//             velocity.x = horizontal.x;
-//             velocity.z = horizontal.z;
-//             // Don't overwrite velocity.y - let gravity handle it
-//         }
-//     }
-// }

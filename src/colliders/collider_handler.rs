@@ -1,4 +1,4 @@
-use avian3d::prelude::Collider;
+use avian3d::prelude::{Collider, CollisionLayers, PhysicsLayer};
 use bevy::prelude::*;
 
 use std::sync::Mutex;
@@ -9,13 +9,20 @@ use crate::world::{ChunkEntities, get_chunk_index};
 
 const COLLIDER_PRUNE_DISTANCE: u32 = 3;
 
-#[derive(Resource)]
-pub struct ColliderChannel {
-    pub sender: Sender<Collider>,
-    pub reciever: Mutex<Receiver<(IVec3, Collider)>>,
+#[derive(PhysicsLayer, Clone, Copy, Debug, Default)]
+pub enum Layers {
+    #[default]
+    Default, // Layer 0 - the default layer that objects are assigned to
+    Player,  // Layer 1
+    Terrain, // Layer 3
 }
 
 // TODO: Make nearby collider generation async.
+//#[derive(Resource)]
+pub struct _ColliderChannel {
+    _sender: Sender<Collider>,
+    _reciever: Mutex<Receiver<(IVec3, Collider)>>,
+}
 
 pub struct ChunkColliderPlugin;
 
@@ -38,12 +45,16 @@ fn generate_colliders(
         if let Some(entities) = chunk_entities.chunks.get(&chunk_pos) {
             for &entity_id in entities {
                 if let Ok(mesh3d) = mesh_query.get(entity_id)
-                    && let Some(mesh) = meshes.get(&mesh3d.0) {
-                        let collider = Collider::trimesh_from_mesh(mesh);
-                        if let Some(collider) = collider {
-                            commands.entity(entity_id).insert(collider);
-                        }
+                    && let Some(mesh) = meshes.get(&mesh3d.0)
+                {
+                    let collider = Collider::trimesh_from_mesh(mesh);
+                    if let Some(collider) = collider {
+                        commands.entity(entity_id).insert((
+                            collider,
+                            CollisionLayers::new([Layers::Terrain], [Layers::Player]),
+                        ));
                     }
+                }
             }
         }
     }
@@ -51,7 +62,7 @@ fn generate_colliders(
 
 // probably want to combine this with chunk render pruning logic...
 fn prune_colliders(
-    colliders_transform: Query<(Entity, &Transform), (With<Collider>, Without<Player>)>,
+    colliders_transform: Query<(Entity, &Transform), With<Collider>>,
     player_transform: Query<&Transform, With<Player>>,
     mut commands: Commands,
 ) {
