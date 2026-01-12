@@ -1,8 +1,8 @@
 use avian3d::PhysicsPlugins;
 use avian3d::prelude::PhysicsDebugPlugin;
 use bevy::prelude::*;
-use game::colliders::ChunkColliderPlugin;
 use game::common::{GameState, InputPlugin};
+use game::physics::ChunkColliderPlugin;
 use game::plugins::*;
 use game::ui::UiPlugin;
 use game::world::{ChunkHandlerPlugin, WorldPlugin};

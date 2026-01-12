@@ -2,8 +2,8 @@ use avian3d::prelude::*;
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 
-use crate::colliders::collider_handler::Layers;
 use crate::common::*;
+use crate::physics::colliders::Layers;
 use crate::plugins::camera::Angles2D;
 use crate::plugins::movement::*;
 
