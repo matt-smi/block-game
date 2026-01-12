@@ -14,22 +14,23 @@ impl Plugin for InputPlugin {
 }
 
 #[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug, Reflect)]
-#[actionlike(DualAxis)]
 pub enum GameAction {
+    #[actionlike(DualAxis)]
     MoveHorizontal,
+    #[actionlike(DualAxis)]
     Look,
+    Jump,
     #[actionlike(Axis)]
     MoveVertical,
+    Sprint
 }
 
 pub fn default_game_action_map() -> InputMap<GameAction> {
     InputMap::default()
         .with_dual_axis(GameAction::MoveHorizontal, VirtualDPad::wasd())
         .with_dual_axis(GameAction::Look, MouseMove::default())
-        .with_axis(
-            GameAction::MoveVertical,
-            VirtualAxis::new(KeyCode::ShiftLeft, KeyCode::Space),
-        )
+        .with(GameAction::Jump, KeyCode::Space)
+        .with(GameAction::Sprint, KeyCode::ShiftLeft)
 }
 
 #[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug, Reflect)]
