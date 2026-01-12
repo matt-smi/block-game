@@ -1,11 +1,11 @@
 use avian3d::PhysicsPlugins;
 use avian3d::prelude::PhysicsDebugPlugin;
 use bevy::prelude::*;
+use game::colliders::ChunkColliderPlugin;
 use game::common::{GameState, InputPlugin};
 use game::plugins::*;
 use game::ui::UiPlugin;
 use game::world::{ChunkHandlerPlugin, WorldPlugin};
-use game::colliders::{ChunkColliderPlugin};
 
 fn main() {
     App::new()
@@ -18,7 +18,7 @@ fn main() {
             }),
             ..default()
         }))
-       .add_plugins(PhysicsPlugins::default().build())
+        .add_plugins(PhysicsPlugins::default().build())
         .add_plugins(InputPlugin)
         .add_plugins(DebugPlugin {
             should_print: false,
@@ -27,7 +27,7 @@ fn main() {
         .add_plugins(WorldPlugin)
         .add_plugins(UiPlugin)
         .add_plugins(PlayerPlugin)
-        .add_plugins(PhysicsDebugPlugin)
+        .add_plugins(PhysicsDebugPlugin) //uncomment for collider visuals
         .add_plugins(CameraPlugin)
         .add_plugins(ChunkHandlerPlugin)
         .add_plugins(ChunkColliderPlugin)

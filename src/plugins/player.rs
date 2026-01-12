@@ -1,6 +1,6 @@
+use avian3d::prelude::*;
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
-use avian3d::prelude::*; 
 
 use crate::common::*;
 use crate::plugins::camera::Angles2D;
@@ -88,7 +88,7 @@ fn player_move(single: Single<(Movement, &ActionState<GameAction>), With<Player>
 //     action_state: Option<Res<ActionState<GameAction>>>, // Adjust based on your input system
 // ) {
 //     for (mut velocity, angles) in &mut query {
-//         if let Some(action_state) = action_state { 
+//         if let Some(action_state) = action_state {
 //             let mut direction = Vec3::ZERO;
 //             let yaw_rot = Quat::from_rotation_y(angles.yaw);
 

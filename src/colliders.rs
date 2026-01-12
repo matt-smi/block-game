@@ -1,4 +1,3 @@
-pub mod chunk_colliders;
+pub mod collider_handler;
 
-
-pub use chunk_colliders::ChunkColliderPlugin;
+pub use collider_handler::ChunkColliderPlugin;

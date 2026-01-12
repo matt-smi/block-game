@@ -1,8 +1,8 @@
-use avian3d::prelude::{PhysicsSystems};
+use avian3d::prelude::PhysicsSystems;
 use bevy::prelude::*;
+use bevy::transform::TransformSystems;
 use bevy::window::{CursorGrabMode, CursorOptions};
 use leafwing_input_manager::prelude::ActionState;
-use bevy::transform::TransformSystems;
 
 use crate::common::{GameAction, GameState};
 use crate::plugins::movement::Movement;
@@ -26,9 +26,11 @@ impl Plugin for CameraPlugin {
             .add_systems(OnExit(GameState::Playing), unlock_cursor)
             .add_systems(
                 PostUpdate,
-    (orbit, camera_look)
-        .after(PhysicsSystems::Prepare)
-            .before(TransformSystems::Propagate).run_if(in_state(GameState::Playing)));    
+                (orbit, camera_look)
+                    .after(PhysicsSystems::Prepare)
+                    .before(TransformSystems::Propagate)
+                    .run_if(in_state(GameState::Playing)),
+            );
     }
 }
 
@@ -53,13 +55,12 @@ fn unlock_cursor(mut cursor_options: Query<&mut CursorOptions>) {
 
 fn orbit(
     mut camera: Single<&mut Transform, With<Camera>>,
-player_transform: Query<&Transform, (With<Player>, Without<Camera>)>,
+    player_transform: Query<&Transform, (With<Player>, Without<Camera>)>,
 ) {
     let target = player_transform.single().unwrap();
     camera.translation = target.translation - camera.forward() * ORBIT_DISTANCE;
     camera.rotation = target.rotation;
 }
-
 
 fn camera_look(
     single_player: Single<(Movement, &ActionState<GameAction>), With<Player>>,
