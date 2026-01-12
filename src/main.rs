@@ -1,5 +1,5 @@
 use avian3d::PhysicsPlugins;
-use avian3d::prelude::PhysicsDebugPlugin;
+//use avian3d::prelude::PhysicsDebugPlugin;
 use bevy::prelude::*;
 use game::common::{GameState, InputPlugin};
 use game::physics::ChunkColliderPlugin;
