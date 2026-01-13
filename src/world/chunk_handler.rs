@@ -3,13 +3,15 @@ use crate::world::{
     ChunkChannel, ChunkEntities, LastChunk, chunk_view_generator, generate_mesh,
     generate_no_padding_dumby_chunk,
 };
+use bevy::ecs::relationship::RelationshipSourceCollection;
 use bevy::prelude::*;
 use bevy::tasks::AsyncComputeTaskPool;
 use std::sync::Mutex;
 use std::sync::mpsc::channel;
 
-const CHUNK_LOAD_DISTANCE: i32 = 64;
+const CHUNK_LOAD_DISTANCE: i32 = 2;
 
+// TODO: Look into using commandQueue instead of mpsc:channel.
 pub struct ChunkHandlerPlugin;
 impl Plugin for ChunkHandlerPlugin {
     fn build(&self, app: &mut App) {
@@ -45,7 +47,6 @@ fn chunk_changed(
     {
         return false;
     }
-    println!("TRUEE");
     true
 }
 
@@ -57,22 +58,24 @@ fn prune_chunks(
 ) {
     let (transform, _, _) = single.into_inner();
     let curr_chunk = get_chunk_index(transform.translation);
-    println!("curr_chunk {:?}", curr_chunk);
-    println!("Chunks in view {:?}", chunk_entities.chunks.len());
-    chunk_entities.chunks.retain(|key, entities| {
-        let dx = (curr_chunk.x - key.x).abs();
-        let dz = (curr_chunk.z - key.z).abs();
+    let mut to_despawn: Vec<Entity> = Vec::new();
+    let min_x = curr_chunk.x - CHUNK_LOAD_DISTANCE;
+    let max_x = curr_chunk.x + CHUNK_LOAD_DISTANCE;
+    let min_z = curr_chunk.z - CHUNK_LOAD_DISTANCE;
+    let max_z = curr_chunk.z + CHUNK_LOAD_DISTANCE;
 
-        // Keep if within square bounds
-        let in_bounds = dx <= CHUNK_LOAD_DISTANCE && dz <= CHUNK_LOAD_DISTANCE;
-        println!("in_bounds {:?}", in_bounds);
+    chunk_entities.chunks.retain(|key, entities| {
+        let in_bounds = key.x >= min_x && key.x <= max_x && key.z >= min_z && key.z <= max_z;
+
         if !in_bounds {
-            for entity in entities {
-                commands.entity(*entity).despawn();
-            }
+            to_despawn.extend(entities.iter());
         }
         in_bounds
     });
+
+    for entity in to_despawn {
+        commands.entity(entity).despawn();
+    }
 }
 
 // Maybe in the future make it so nearby chunks like 3x3 are blocking/synchronous to ensure the player is standing on something
@@ -99,7 +102,7 @@ fn load_chunks(
                 .spawn(async move {
                     let interior_chunk = generate_no_padding_dumby_chunk();
 
-                    let mut chunk_views = chunk_view_generator(&interior_chunk);
+                    let mut chunk_views = chunk_view_generator(&interior_chunk); // add a neighbour function...
                     if let Some(mesh) = generate_mesh(&mut chunk_views, &interior_chunk) {
                         let _ = tx.send((new_chunk_pos, mesh));
                     }

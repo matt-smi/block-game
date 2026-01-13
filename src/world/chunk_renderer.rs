@@ -1,8 +1,8 @@
 use bevy::asset::RenderAssetUsages;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
-use bevy::render::mesh::Indices;
 use bevy::render::render_resource::PrimitiveTopology;
+use bevy_mesh::*;
 
 use crate::world::*;
 
@@ -77,7 +77,6 @@ pub fn generate_no_padding_dumby_chunk() -> VoxelData {
 
     const MAX_HEIGHT: u32 = 20;
     const HILL_RADIUS: f32 = 15.0;
-    const STONE_LAYER_HEIGHT: u32 = 6;
     const MIN_HEIGHT: f32 = 5.0;
 
     for x in 0..CHUNK_DIMENSION {
@@ -92,9 +91,7 @@ pub fn generate_no_padding_dumby_chunk() -> VoxelData {
 
             for y in 0..CHUNK_DIMENSION {
                 if y < height {
-                    if y < STONE_LAYER_HEIGHT {
-                        chunk.set(x, y, z, VoxelId::Stone);
-                    } else if y < height - 1 {
+                    if y < height - 1 {
                         chunk.set(x, y, z, VoxelId::Dirt);
                     } else {
                         chunk.set(x, y, z, VoxelId::Grass);

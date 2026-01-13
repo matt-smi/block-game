@@ -1,3 +1,4 @@
+use avian3d::PhysicsPlugins;
 use bevy::prelude::*;
 use game::common::{GameState, InputPlugin};
 use game::plugins::*;
@@ -15,6 +16,7 @@ fn main() {
             }),
             ..default()
         }))
+        .add_plugins(PhysicsPlugins::default())
         .add_plugins(InputPlugin)
         .add_plugins(DebugPlugin {
             should_print: false,
