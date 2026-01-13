@@ -7,6 +7,7 @@ use bevy_mesh::*;
 use crate::world::*;
 
 // TODO: Add chunk exterior face pruning
+// TODO (maybe): Look into LOD for render distance of 50+
 
 pub struct WorldPlugin;
 impl Plugin for WorldPlugin {
@@ -85,65 +86,66 @@ pub fn generate_no_padding_dumby_chunk() -> VoxelData {
             let dz = (z as i32 - center_z as i32).abs();
             let dist = ((dx * dx + dz * dz) as f32).sqrt();
 
-            let base_height = (MAX_HEIGHT as f32 * (1.0 - (dist / HILL_RADIUS).min(1.0))) as u32;
-            let wave = ((x as f32 * 0.3).sin() + (z as f32 * 0.3).cos()) * 2.0;
-            let height = (base_height as f32 + wave).max(MIN_HEIGHT) as u32;
+            // let base_height = (MAX_HEIGHT as f32 * (1.0 - (dist / HILL_RADIUS).min(1.0))) as u32;
+            // let wave = ((x as f32 * 0.3).sin() + (z as f32 * 0.3).cos()) * 2.0;
+            // let height = (base_height as f32 + wave).max(MIN_HEIGHT) as u32;
+            let height = 3;
 
             for y in 0..CHUNK_DIMENSION {
                 if y < height {
                     if y < height - 1 {
                         chunk.set(x, y, z, VoxelId::Dirt);
-                    } else {
-                        chunk.set(x, y, z, VoxelId::Grass);
+                    // } else {
+                    //     chunk.set(x, y, z, VoxelId::Grass);
                     }
                 }
             }
         }
     }
 
-    // Add a stone tower in the center
-    const TOWER_HEIGHT: u32 = 28;
-    const TOWER_RADIUS: i32 = 3;
-    for y in 0..TOWER_HEIGHT {
-        for offset_x in -TOWER_RADIUS..=TOWER_RADIUS {
-            for offset_z in -TOWER_RADIUS..=TOWER_RADIUS {
-                let tx = (center_x as i32 + offset_x) as u32;
-                let tz = (center_z as i32 + offset_z) as u32;
+    // // Add a stone tower in the center
+    // const TOWER_HEIGHT: u32 = 28;
+    // const TOWER_RADIUS: i32 = 3;
+    // for y in 0..TOWER_HEIGHT {
+    //     for offset_x in -TOWER_RADIUS..=TOWER_RADIUS {
+    //         for offset_z in -TOWER_RADIUS..=TOWER_RADIUS {
+    //             let tx = (center_x as i32 + offset_x) as u32;
+    //             let tz = (center_z as i32 + offset_z) as u32;
 
-                if tx < CHUNK_DIMENSION && tz < CHUNK_DIMENSION {
-                    let tower_dist = ((offset_x * offset_x + offset_z * offset_z) as f32).sqrt();
+    //             if tx < CHUNK_DIMENSION && tz < CHUNK_DIMENSION {
+    //                 let tower_dist = ((offset_x * offset_x + offset_z * offset_z) as f32).sqrt();
 
-                    if tower_dist <= TOWER_RADIUS as f32 && tower_dist >= (TOWER_RADIUS - 1) as f32
-                    {
-                        chunk.set(tx, y, tz, VoxelId::Stone);
-                    }
+    //                 if tower_dist <= TOWER_RADIUS as f32 && tower_dist >= (TOWER_RADIUS - 1) as f32
+    //                 {
+    //                     chunk.set(tx, y, tz, VoxelId::Stone);
+    //                 }
 
-                    if y == TOWER_HEIGHT - 1
-                        && tower_dist <= TOWER_RADIUS as f32
-                        && (offset_x + offset_z) % 2 == 0
-                    {
-                        chunk.set(tx, y, tz, VoxelId::Stone);
-                        if y + 1 < CHUNK_DIMENSION {
-                            chunk.set(tx, y + 1, tz, VoxelId::Stone);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    const PILLAR_HEIGHT: u32 = 15;
-    let pillar_positions = [
-        (5, 5),
-        (CHUNK_DIMENSION - 6, 5),
-        (5, CHUNK_DIMENSION - 6),
-        (CHUNK_DIMENSION - 6, CHUNK_DIMENSION - 6),
-    ];
+    //                 if y == TOWER_HEIGHT - 1
+    //                     && tower_dist <= TOWER_RADIUS as f32
+    //                     && (offset_x + offset_z) % 2 == 0
+    //                 {
+    //                     chunk.set(tx, y, tz, VoxelId::Stone);
+    //                     if y + 1 < CHUNK_DIMENSION {
+    //                         chunk.set(tx, y + 1, tz, VoxelId::Stone);
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
+    // const PILLAR_HEIGHT: u32 = 15;
+    // let pillar_positions = [
+    //     (5, 5),
+    //     (CHUNK_DIMENSION - 6, 5),
+    //     (5, CHUNK_DIMENSION - 6),
+    //     (CHUNK_DIMENSION - 6, CHUNK_DIMENSION - 6),
+    // ];
 
-    for (px, pz) in pillar_positions {
-        for y in 0..PILLAR_HEIGHT {
-            chunk.set(px, y, pz, VoxelId::Stone);
-        }
-    }
+    // for (px, pz) in pillar_positions {
+    //     for y in 0..PILLAR_HEIGHT {
+    //         chunk.set(px, y, pz, VoxelId::Stone);
+    //     }
+    // }
 
     chunk
 }
