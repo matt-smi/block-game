@@ -8,7 +8,7 @@ use crate::plugins::camera::Angles2D;
 use crate::plugins::movement::*;
 
 const PLAYER_SPEED: f32 = 10.0;
-const JUMP_VELOCITY: f32 = 10.5; 
+const JUMP_VELOCITY: f32 = 10.5;
 const PLAYER_SCALE: f32 = 0.5;
 const PLAYER_SPRINT_SPEED: f32 = PLAYER_SPEED * 1.5;
 
@@ -85,16 +85,15 @@ fn player_move(single: Single<(Movement, &ActionState<GameAction>), With<Player>
 
     let mut horizontal_velocity = direction.normalize_or_zero();
 
-    if action_state.just_pressed(&GameAction::Jump){ 
-        linear_velocity.y += JUMP_VELOCITY; 
+    if action_state.just_pressed(&GameAction::Jump) {
+        linear_velocity.y += JUMP_VELOCITY;
     }
 
-    if action_state.pressed(&GameAction::Sprint){ 
+    if action_state.pressed(&GameAction::Sprint) {
         horizontal_velocity *= PLAYER_SPRINT_SPEED;
-    } else { 
+    } else {
         horizontal_velocity *= PLAYER_SPEED;
     }
     linear_velocity.x = horizontal_velocity.x;
     linear_velocity.z = horizontal_velocity.z;
 }
-

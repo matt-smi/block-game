@@ -22,7 +22,7 @@ pub enum GameAction {
     Jump,
     #[actionlike(Axis)]
     MoveVertical,
-    Sprint
+    Sprint,
 }
 
 pub fn default_game_action_map() -> InputMap<GameAction> {
