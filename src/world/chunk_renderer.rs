@@ -274,10 +274,10 @@ fn emit_quads(
     let v2 = base_pos + u_vec * u_end_f + v_vec * v_end_f;
     let v3 = base_pos + u_vec * u_start_f + v_vec * v_end_f;
 
-    buffers.vertices.push(v0);
-    buffers.vertices.push(v1);
-    buffers.vertices.push(v2);
-    buffers.vertices.push(v3);
+    buffers.vertices.push(v0 * 0.5);
+    buffers.vertices.push(v1 * 0.5);
+    buffers.vertices.push(v2 * 0.5);
+    buffers.vertices.push(v3 * 0.5);
 
     buffers.normals.push(-normal);
     buffers.normals.push(-normal);

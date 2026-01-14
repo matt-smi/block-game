@@ -1,13 +1,16 @@
+use avian3d::prelude::*;
 use bevy::prelude::*;
 use leafwing_input_manager::prelude::*;
 
 use crate::common::*;
+use crate::physics::colliders::Layers;
 use crate::plugins::camera::Angles2D;
 use crate::plugins::movement::*;
 
-const INIT_VELOCITY: Vec3 = Vec3::ZERO;
-const PLAYER_SPEED: f32 = 15.0;
+const PLAYER_SPEED: f32 = 10.0;
+const JUMP_VELOCITY: f32 = 10.5;
 const PLAYER_SCALE: f32 = 0.5;
+const PLAYER_SPRINT_SPEED: f32 = PLAYER_SPEED * 1.5;
 
 #[derive(Component)]
 pub struct Player;
@@ -43,6 +46,7 @@ fn spawn_player(
         MeshMaterial3d(handle),
         Transform {
             scale: Vec3::new(PLAYER_SCALE, PLAYER_SCALE, PLAYER_SCALE),
+            translation: Vec3::new(0., 20., 0.),
             ..default()
         },
         Angles2D {
@@ -50,9 +54,11 @@ fn spawn_player(
             pitch: 0.0,
         },
         Player,
-        Velocity {
-            value: INIT_VELOCITY,
-        },
+        RigidBody::Dynamic,
+        LinearVelocity::default(),
+        GravityScale(2.5),
+        Collider::capsule(PLAYER_SCALE * 1.1, PLAYER_SCALE * 1.8),
+        CollisionLayers::new([Layers::Player], [Layers::Terrain]),
         default_game_action_map(),
     ));
 }
@@ -65,22 +71,29 @@ fn player_look(single: Single<(Movement, &ActionState<GameAction>), With<Player>
     angles.pitch = (angles.pitch - mouse_delta.y * MOUSE_SENSITIVITY)
         .clamp(-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2);
 
-    transform.rotation = Quat::from_rotation_y(angles.yaw) * Quat::from_rotation_x(angles.pitch);
+    transform.rotation = Quat::from_rotation_y(angles.yaw) //* Quat::from_rotation_x(angles.pitch);
 }
 
 fn player_move(single: Single<(Movement, &ActionState<GameAction>), With<Player>>) {
-    let ((_transform, mut velocity, angles), action_state) = single.into_inner();
+    let ((_transform, mut linear_velocity, angles), action_state) = single.into_inner();
     let mut direction = Vec3::ZERO;
     let yaw_rot = Quat::from_rotation_y(angles.yaw);
 
-    // Horizontal direction handling
     let hori = action_state.clamped_axis_pair(&GameAction::MoveHorizontal);
     direction += hori.x * (yaw_rot * Vec3::X).normalize();
     direction += hori.y * -(yaw_rot * Vec3::Z).normalize();
 
-    // Vertical direction handling
-    let vert = action_state.clamped_value(&GameAction::MoveVertical);
-    direction += vert * Vec3::Y;
+    let mut horizontal_velocity = direction.normalize_or_zero();
 
-    velocity.value = direction.normalize_or_zero() * PLAYER_SPEED;
+    if action_state.just_pressed(&GameAction::Jump) {
+        linear_velocity.y += JUMP_VELOCITY;
+    }
+
+    if action_state.pressed(&GameAction::Sprint) {
+        horizontal_velocity *= PLAYER_SPRINT_SPEED;
+    } else {
+        horizontal_velocity *= PLAYER_SPEED;
+    }
+    linear_velocity.x = horizontal_velocity.x;
+    linear_velocity.z = horizontal_velocity.z;
 }

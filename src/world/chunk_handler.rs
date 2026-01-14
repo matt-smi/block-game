@@ -3,13 +3,15 @@ use crate::world::{
     ChunkChannel, ChunkEntities, LastChunk, chunk_view_generator, generate_mesh,
     generate_no_padding_dumby_chunk,
 };
+
+use avian3d::prelude::*;
 use bevy::ecs::relationship::RelationshipSourceCollection;
 use bevy::prelude::*;
 use bevy::tasks::AsyncComputeTaskPool;
 use std::sync::Mutex;
 use std::sync::mpsc::channel;
 
-const CHUNK_LOAD_DISTANCE: i32 = 2;
+const CHUNK_LOAD_DISTANCE: i32 = 16;
 
 // TODO: Look into using commandQueue instead of mpsc:channel.
 pub struct ChunkHandlerPlugin;
@@ -112,6 +114,8 @@ fn load_chunks(
     }
 }
 
+// voxelized tri-mesh after... compare performance
+// need to also make colliders async... after since current will always be synchronous, and async will be the close 6 neighbours...
 fn process_chunk_meshes(
     chunk_channel: Res<ChunkChannel>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -123,6 +127,9 @@ fn process_chunk_meshes(
 
     // Process all completed chunks this frame
     while let Ok((chunk_pos, mesh)) = rx.try_recv() {
+        //   let collider = Collider::voxelized_trimesh_from_mesh(&mesh, 0.5, FillMode::SurfaceOnly)
+        // .expect("Failed to create collider from mesh");
+
         let entity = commands
             .spawn((
                 Mesh3d(meshes.add(mesh)),
@@ -130,15 +137,16 @@ fn process_chunk_meshes(
                     base_color: Color::srgb(1.0, 1.0, 1.0),
                     ..default()
                 })),
-                Transform::from_xyz(16.0 * chunk_pos.x as f32, 0.0, 16.0 * chunk_pos.z as f32)
-                    .with_scale(Vec3::splat(0.5)),
+                Transform::from_xyz(16.0 * chunk_pos.x as f32, 0.0, 16.0 * chunk_pos.z as f32),
+                RigidBody::Static,
+                //collider,
             ))
             .id();
 
         chunk_entities.chunks.insert(chunk_pos, vec![entity]);
     }
 }
-
+//mesh can be generated from points not even mesh needed.
 fn update_last_chunk(player: Single<&Transform, With<Player>>, mut commands: Commands) {
     let curr_chunk = get_chunk_index(player.translation);
     commands.insert_resource(LastChunk {
@@ -146,7 +154,7 @@ fn update_last_chunk(player: Single<&Transform, With<Player>>, mut commands: Com
     });
 }
 
-fn get_chunk_index(world_position: Vec3) -> IVec3 {
+pub fn get_chunk_index(world_position: Vec3) -> IVec3 {
     IVec3::new(
         (world_position.x / 16.0).floor() as i32,
         0,
