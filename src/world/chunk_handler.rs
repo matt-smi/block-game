@@ -114,7 +114,6 @@ fn load_chunks(
     }
 }
 
-// voxelized tri-mesh after... compare performance
 // need to also make colliders async... after since current will always be synchronous, and async will be the close 6 neighbours...
 fn process_chunk_meshes(
     chunk_channel: Res<ChunkChannel>,
@@ -125,11 +124,7 @@ fn process_chunk_meshes(
 ) {
     let rx = chunk_channel.receiver.lock().unwrap();
 
-    // Process all completed chunks this frame
     while let Ok((chunk_pos, mesh)) = rx.try_recv() {
-        //   let collider = Collider::voxelized_trimesh_from_mesh(&mesh, 0.5, FillMode::SurfaceOnly)
-        // .expect("Failed to create collider from mesh");
-
         let entity = commands
             .spawn((
                 Mesh3d(meshes.add(mesh)),
@@ -139,7 +134,6 @@ fn process_chunk_meshes(
                 })),
                 Transform::from_xyz(16.0 * chunk_pos.x as f32, 0.0, 16.0 * chunk_pos.z as f32),
                 RigidBody::Static,
-                //collider,
             ))
             .id();
 
