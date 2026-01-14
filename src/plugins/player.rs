@@ -57,6 +57,8 @@ fn spawn_player(
         RigidBody::Dynamic,
         LinearVelocity::default(),
         GravityScale(2.5),
+        //Friction::new(0.0).with_static_coefficient(0.0).with_combine_rule(CoefficientCombine::Min),
+        Restitution::new(0.0).with_combine_rule(CoefficientCombine::Min),
         Collider::capsule(PLAYER_SCALE * 1.1, PLAYER_SCALE * 1.8),
         CollisionLayers::new([Layers::Player], [Layers::Terrain]),
         default_game_action_map(),

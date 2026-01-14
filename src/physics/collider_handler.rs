@@ -1,4 +1,4 @@
-use avian3d::prelude::{Collider, CollisionLayers};
+use avian3d::prelude::{Collider, CollisionLayers, CollisionMargin};
 use bevy::prelude::*;
 
 use crate::physics::{COLLIDER_PRUNE_DISTANCE, Layers};
@@ -33,6 +33,7 @@ fn generate_colliders(
                         commands.entity(entity_id).insert((
                             collider,
                             CollisionLayers::new([Layers::Terrain], [Layers::Player]),
+                            CollisionMargin(0.005),
                         ));
                     }
                 }

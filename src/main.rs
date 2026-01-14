@@ -7,6 +7,7 @@ use game::plugins::*;
 use game::ui::UiPlugin;
 use game::world::{ChunkHandlerPlugin, WorldPlugin};
 
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
