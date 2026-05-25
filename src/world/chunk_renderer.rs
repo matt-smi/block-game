@@ -4,6 +4,7 @@ use bevy::prelude::*;
 use bevy::render::render_resource::PrimitiveTopology;
 use bevy_mesh::*;
 
+use crate::world::WORLD_VOXEL_SIZE;
 use crate::world::*;
 
 // TODO: Add chunk exterior face pruning
@@ -25,8 +26,6 @@ pub struct VoxelResource {
     pub materials: Vec<Handle<StandardMaterial>>,
     pub mesh: Handle<Mesh>,
 }
-
-const VOXEL_SIZE: f32 = 1.0;
 
 #[derive(Copy, Clone)]
 struct Basis {
@@ -251,14 +250,14 @@ fn emit_quads(
     basis: Basis,
     colour: [f32; 4],
 ) {
-    let depth_f = params.depth as f32 * VOXEL_SIZE;
-    let u_start_f = params.u_start as f32 * VOXEL_SIZE;
-    let v_start_f = params.v_start as f32 * VOXEL_SIZE;
-    let u_end_f = (params.u_start + params.u_dimension) as f32 * VOXEL_SIZE;
-    let v_end_f = (params.v_start + params.v_dimension) as f32 * VOXEL_SIZE;
+    let depth_f = params.depth as f32 * WORLD_VOXEL_SIZE;
+    let u_start_f = params.u_start as f32 * WORLD_VOXEL_SIZE;
+    let v_start_f = params.v_start as f32 * WORLD_VOXEL_SIZE;
+    let u_end_f = (params.u_start + params.u_dimension) as f32 * WORLD_VOXEL_SIZE;
+    let v_end_f = (params.v_start + params.v_dimension) as f32 * WORLD_VOXEL_SIZE;
 
     let face_offset = if normal.x < 0. || normal.y < 0. || normal.z < 0. {
-        1.0
+        WORLD_VOXEL_SIZE
     } else {
         0.0
     };
@@ -277,10 +276,10 @@ fn emit_quads(
     let v2 = base_pos + u_vec * u_end_f + v_vec * v_end_f;
     let v3 = base_pos + u_vec * u_start_f + v_vec * v_end_f;
 
-    buffers.vertices.push(v0 * 0.5);
-    buffers.vertices.push(v1 * 0.5);
-    buffers.vertices.push(v2 * 0.5);
-    buffers.vertices.push(v3 * 0.5);
+    buffers.vertices.push(v0);
+    buffers.vertices.push(v1);
+    buffers.vertices.push(v2);
+    buffers.vertices.push(v3);
 
     buffers.normals.push(-normal);
     buffers.normals.push(-normal);

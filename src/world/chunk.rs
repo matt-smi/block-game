@@ -26,7 +26,7 @@ pub const VOXEL_MAPPING: VoxelMapping = VoxelMapping {
 
 pub const CHUNK_DIMENSION: u32 = 32;
 pub const CHUNK_DATA_SIZE: usize = (CHUNK_DIMENSION * CHUNK_DIMENSION * CHUNK_DIMENSION) as usize;
-pub const WORLD_VOXEL_SIZE: f32 = 0.5;
+pub const WORLD_VOXEL_SIZE: f32 = 0.6;
 pub const CHUNK_WORLD_SIZE: f32 = CHUNK_DIMENSION as f32 * WORLD_VOXEL_SIZE;
 
 #[derive(Component)]

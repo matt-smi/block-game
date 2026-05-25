@@ -9,7 +9,7 @@ use bevy::tasks::AsyncComputeTaskPool;
 use std::sync::Mutex;
 use std::sync::mpsc::channel;
 
-const CHUNK_LOAD_DISTANCE: i32 = 16;
+const CHUNK_LOAD_DISTANCE: i32 = 14;
 
 // TODO: Look into using commandQueue instead of mpsc:channel.
 pub struct ChunkHandlerPlugin;
@@ -102,7 +102,7 @@ fn load_chunks(
 
             AsyncComputeTaskPool::get()
                 .spawn(async move {
-                    let interior_chunk = generate_no_padding_dumby_chunk();
+                    let interior_chunk = generate_no_padding_dumby_chunk(); // grab generated chunk at pos
 
                     let mut chunk_views = chunk_view_generator(&interior_chunk); // add a neighbour function...
                     if let Some(mesh) = generate_mesh(&mut chunk_views, &interior_chunk) {
