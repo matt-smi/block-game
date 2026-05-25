@@ -1,27 +1,47 @@
 use avian3d::prelude::*;
 use bevy::prelude::*;
+use bevy::time::Fixed;
 use leafwing_input_manager::prelude::*;
 
 use crate::common::*;
-use crate::physics::colliders::Layers;
 use crate::plugins::camera::Angles2D;
 use crate::plugins::movement::*;
+use crate::world::{ChunkVoxels, is_solid_global_voxel, world_to_global_voxel};
 
 const PLAYER_SPEED: f32 = 10.0;
-const JUMP_VELOCITY: f32 = 10.5;
+const JUMP_VELOCITY: f32 = 15.5;
+const PLAYER_GRAVITY: f32 = 35.0;
 const PLAYER_SCALE: f32 = 0.5;
 const PLAYER_SPRINT_SPEED: f32 = PLAYER_SPEED * 1.5;
+const PLAYER_HALF_EXTENTS: Vec3 = Vec3::new(0.24, 0.5, 0.24);
+// A slightly slimmer upward sweep avoids snagging on voxel corners during takeoff.
+const PLAYER_UPWARD_HALF_EXTENTS: Vec3 = Vec3::new(0.18, 0.5, 0.18);
+const PLAYER_SKIN_WIDTH: f32 = 0.001;
+const COLLISION_BINARY_STEPS: usize = 10;
+const COYOTE_TIME: f32 = 0.08;
+const BLOCK_TOLERANCE: f32 = 0.001;
+const AXIS_X: usize = 0;
+const AXIS_Y: usize = 1;
+const AXIS_Z: usize = 2;
 
 #[derive(Component)]
 pub struct Player;
 
+#[derive(Component, Default)]
+struct PlayerMotionState {
+    coyote_time_remaining: f32,
+    grounded: bool,
+}
+
 pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_player).add_systems(
-            Update,
-            (player_look, player_move).run_if(in_state(GameState::Playing)),
-        );
+        app.add_systems(Startup, spawn_player)
+            .add_systems(Update, player_look.run_if(in_state(GameState::Playing)))
+            .add_systems(
+                FixedUpdate,
+                player_move.run_if(in_state(GameState::Playing)),
+            );
     }
 }
 
@@ -53,14 +73,9 @@ fn spawn_player(
             yaw: 0.0,
             pitch: 0.0,
         },
+        PlayerMotionState::default(),
         Player,
-        RigidBody::Dynamic,
         LinearVelocity::default(),
-        GravityScale(2.5),
-        //Friction::new(0.0).with_static_coefficient(0.0).with_combine_rule(CoefficientCombine::Min),
-        Restitution::new(0.0).with_combine_rule(CoefficientCombine::Min),
-        Collider::capsule(PLAYER_SCALE * 1.1, PLAYER_SCALE * 1.8),
-        CollisionLayers::new([Layers::Player], [Layers::Terrain]),
         default_game_action_map(),
     ));
 }
@@ -76,10 +91,16 @@ fn player_look(single: Single<(Movement, &ActionState<GameAction>), With<Player>
     transform.rotation = Quat::from_rotation_y(angles.yaw) //* Quat::from_rotation_x(angles.pitch);
 }
 
-fn player_move(single: Single<(Movement, &ActionState<GameAction>), With<Player>>) {
-    let ((_transform, mut linear_velocity, angles), action_state) = single.into_inner();
+fn player_move(
+    single: Single<(Movement, &ActionState<GameAction>, &mut PlayerMotionState), With<Player>>,
+    chunk_voxels: Res<ChunkVoxels>,
+    time: Res<Time<Fixed>>,
+) {
+    let ((mut transform, mut linear_velocity, angles), action_state, mut motion_state) =
+        single.into_inner();
     let mut direction = Vec3::ZERO;
     let yaw_rot = Quat::from_rotation_y(angles.yaw);
+    let dt = time.delta_secs();
 
     let hori = action_state.clamped_axis_pair(&GameAction::MoveHorizontal);
     direction += hori.x * (yaw_rot * Vec3::X).normalize();
@@ -87,15 +108,145 @@ fn player_move(single: Single<(Movement, &ActionState<GameAction>), With<Player>
 
     let mut horizontal_velocity = direction.normalize_or_zero();
 
-    if action_state.just_pressed(&GameAction::Jump) {
-        linear_velocity.y += JUMP_VELOCITY;
-    }
-
     if action_state.pressed(&GameAction::Sprint) {
         horizontal_velocity *= PLAYER_SPRINT_SPEED;
     } else {
         horizontal_velocity *= PLAYER_SPEED;
     }
+
     linear_velocity.x = horizontal_velocity.x;
     linear_velocity.z = horizontal_velocity.z;
+
+    if motion_state.grounded {
+        motion_state.coyote_time_remaining = COYOTE_TIME;
+    } else {
+        motion_state.coyote_time_remaining = (motion_state.coyote_time_remaining - dt).max(0.0);
+    }
+
+    let mut jumped_this_frame = false;
+    if (motion_state.grounded || motion_state.coyote_time_remaining > 0.0)
+        && action_state.just_pressed(&GameAction::Jump)
+    {
+        linear_velocity.y = JUMP_VELOCITY;
+        motion_state.coyote_time_remaining = 0.0;
+        motion_state.grounded = false;
+        jumped_this_frame = true;
+    }
+    if !jumped_this_frame {
+        linear_velocity.y -= PLAYER_GRAVITY * dt;
+    }
+
+    let intended_y_delta = linear_velocity.y * dt;
+    let mut next_position = transform.translation;
+
+    if intended_y_delta > 0.0 {
+        next_position = move_axis(
+            next_position,
+            AXIS_Y,
+            intended_y_delta,
+            &chunk_voxels,
+            PLAYER_UPWARD_HALF_EXTENTS,
+        );
+        next_position = move_axis(
+            next_position,
+            AXIS_X,
+            linear_velocity.x * dt,
+            &chunk_voxels,
+            PLAYER_HALF_EXTENTS,
+        );
+        next_position = move_axis(
+            next_position,
+            AXIS_Z,
+            linear_velocity.z * dt,
+            &chunk_voxels,
+            PLAYER_HALF_EXTENTS,
+        );
+    } else {
+        next_position = move_axis(
+            next_position,
+            AXIS_X,
+            linear_velocity.x * dt,
+            &chunk_voxels,
+            PLAYER_HALF_EXTENTS,
+        );
+        next_position = move_axis(
+            next_position,
+            AXIS_Z,
+            linear_velocity.z * dt,
+            &chunk_voxels,
+            PLAYER_HALF_EXTENTS,
+        );
+        next_position = move_axis(
+            next_position,
+            AXIS_Y,
+            intended_y_delta,
+            &chunk_voxels,
+            PLAYER_HALF_EXTENTS,
+        );
+    }
+
+    let actual_y_delta = next_position.y - transform.translation.y;
+    let y_shortfall = intended_y_delta.abs() - actual_y_delta.abs();
+    let y_blocked = y_shortfall > BLOCK_TOLERANCE;
+    if y_blocked {
+        linear_velocity.y = 0.0;
+    }
+    motion_state.grounded = y_blocked && intended_y_delta < 0.0;
+
+    transform.translation = next_position;
+}
+
+fn move_axis(
+    position: Vec3,
+    axis: usize,
+    delta: f32,
+    chunk_voxels: &ChunkVoxels,
+    half_extents: Vec3,
+) -> Vec3 {
+    if delta.abs() <= f32::EPSILON {
+        return position;
+    }
+
+    let mut target = position;
+    target[axis] += delta;
+    if !collides_at(target, chunk_voxels, half_extents) {
+        return target;
+    }
+
+    let mut low = 0.0;
+    let mut high = 1.0;
+    for _ in 0..COLLISION_BINARY_STEPS {
+        let mid = (low + high) * 0.5;
+        let mut test_position = position;
+        test_position[axis] += delta * mid;
+        if collides_at(test_position, chunk_voxels, half_extents) {
+            high = mid;
+        } else {
+            low = mid;
+        }
+    }
+
+    let mut resolved = position;
+    resolved[axis] += delta * low;
+    resolved
+}
+
+fn collides_at(position: Vec3, chunk_voxels: &ChunkVoxels, half_extents: Vec3) -> bool {
+    let min = position - half_extents + Vec3::splat(PLAYER_SKIN_WIDTH);
+    let max = position + half_extents - Vec3::splat(PLAYER_SKIN_WIDTH);
+
+    let min_voxel = world_to_global_voxel(min);
+    let max_voxel = world_to_global_voxel(max);
+
+    for x in min_voxel.x..=max_voxel.x {
+        for y in min_voxel.y..=max_voxel.y {
+            for z in min_voxel.z..=max_voxel.z {
+                if is_solid_global_voxel(chunk_voxels, IVec3::new(x, y, z)) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
 }

@@ -1,10 +1,8 @@
 use crate::plugins::{movement::Movement, player::Player};
 use crate::world::{
-    ChunkChannel, ChunkEntities, LastChunk, chunk_view_generator, generate_mesh,
-    generate_no_padding_dumby_chunk,
+    CHUNK_WORLD_SIZE, ChunkChannel, ChunkEntities, ChunkVoxels, LastChunk, VoxelData,
+    chunk_view_generator, chunk_world_origin, generate_mesh, generate_no_padding_dumby_chunk,
 };
-
-use avian3d::prelude::*;
 use bevy::ecs::relationship::RelationshipSourceCollection;
 use bevy::prelude::*;
 use bevy::tasks::AsyncComputeTaskPool;
@@ -30,7 +28,7 @@ impl Plugin for ChunkHandlerPlugin {
 }
 
 fn set_up_chunk_async(mut command: Commands) {
-    let (tx, rx) = channel::<(IVec3, Mesh)>();
+    let (tx, rx) = channel::<(IVec3, Mesh, VoxelData)>();
     command.insert_resource(ChunkChannel {
         sender: tx,
         receiver: Mutex::new(rx),
@@ -56,6 +54,7 @@ fn chunk_changed(
 fn prune_chunks(
     single: Single<Movement, With<Player>>,
     mut chunk_entities: ResMut<ChunkEntities>,
+    mut chunk_voxels: ResMut<ChunkVoxels>,
     mut commands: Commands,
 ) {
     let (transform, _, _) = single.into_inner();
@@ -71,6 +70,7 @@ fn prune_chunks(
 
         if !in_bounds {
             to_despawn.extend(entities.iter());
+            chunk_voxels.chunks.remove(key);
         }
         in_bounds
     });
@@ -106,7 +106,7 @@ fn load_chunks(
 
                     let mut chunk_views = chunk_view_generator(&interior_chunk); // add a neighbour function...
                     if let Some(mesh) = generate_mesh(&mut chunk_views, &interior_chunk) {
-                        let _ = tx.send((new_chunk_pos, mesh));
+                        let _ = tx.send((new_chunk_pos, mesh, interior_chunk));
                     }
                 })
                 .detach();
@@ -120,11 +120,12 @@ fn process_chunk_meshes(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut chunk_entities: ResMut<ChunkEntities>,
+    mut chunk_voxels: ResMut<ChunkVoxels>,
     mut commands: Commands,
 ) {
     let rx = chunk_channel.receiver.lock().unwrap();
 
-    while let Ok((chunk_pos, mesh)) = rx.try_recv() {
+    while let Ok((chunk_pos, mesh, voxel_data)) = rx.try_recv() {
         let entity = commands
             .spawn((
                 Mesh3d(meshes.add(mesh)),
@@ -132,12 +133,12 @@ fn process_chunk_meshes(
                     base_color: Color::srgb(1.0, 1.0, 1.0),
                     ..default()
                 })),
-                Transform::from_xyz(16.0 * chunk_pos.x as f32, 0.0, 16.0 * chunk_pos.z as f32),
-                RigidBody::Static,
+                Transform::from_translation(chunk_world_origin(chunk_pos)),
             ))
             .id();
 
         chunk_entities.chunks.insert(chunk_pos, vec![entity]);
+        chunk_voxels.chunks.insert(chunk_pos, voxel_data);
     }
 }
 //mesh can be generated from points not even mesh needed.
@@ -150,8 +151,8 @@ fn update_last_chunk(player: Single<&Transform, With<Player>>, mut commands: Com
 
 pub fn get_chunk_index(world_position: Vec3) -> IVec3 {
     IVec3::new(
-        (world_position.x / 16.0).floor() as i32,
+        (world_position.x / CHUNK_WORLD_SIZE).floor() as i32,
         0,
-        (world_position.z / 16.0).floor() as i32,
+        (world_position.z / CHUNK_WORLD_SIZE).floor() as i32,
     )
 }

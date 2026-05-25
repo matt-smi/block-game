@@ -13,6 +13,9 @@ impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(ChunkEntities {
             chunks: HashMap::new(),
+        })
+        .insert_resource(ChunkVoxels {
+            chunks: HashMap::new(),
         });
     }
 }
