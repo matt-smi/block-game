@@ -80,7 +80,6 @@ pub struct ChunkMesh {
     Chunk key is indexed by chunk position. E.g <-2, 0, 10> -> <-2 * CHUNK_SIZE, 0 * CHUNK_SIZE, 10 * CHUNK_SIZE> (world position).
     Also note Y is not used, since the value represents the column at the x, z coordinates.
     Leaving y in here if we want to support chunk layering later on.
-    (TODO: make this a 2D linked-list so it's easier to scan boundary, or introduce some sort of sorting)
 */
 #[derive(Resource)]
 pub struct ChunkEntities {

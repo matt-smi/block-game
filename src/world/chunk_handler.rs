@@ -10,6 +10,7 @@ use std::sync::Mutex;
 use std::sync::mpsc::channel;
 
 const CHUNK_LOAD_DISTANCE: i32 = 14;
+const CHUNK_Y_COUNT: i32 = 20;
 
 // TODO: Look into using commandQueue instead of mpsc:channel.
 pub struct ChunkHandlerPlugin;
@@ -83,8 +84,6 @@ fn prune_chunks(
 // Maybe in the future make it so nearby chunks like 3x3 are blocking/synchronous to ensure the player is standing on something
 fn load_chunks(
     single: Single<Movement, With<Player>>,
-    _materials: ResMut<Assets<StandardMaterial>>,
-    _meshes: ResMut<Assets<Mesh>>,
     chunk_channel: Res<ChunkChannel>,
     chunk_entities: Res<ChunkEntities>,
     _commands: Commands,
@@ -94,22 +93,24 @@ fn load_chunks(
 
     for x in -CHUNK_LOAD_DISTANCE..=CHUNK_LOAD_DISTANCE {
         for z in -CHUNK_LOAD_DISTANCE..=CHUNK_LOAD_DISTANCE {
-            let tx = chunk_channel.sender.clone();
-            let new_chunk_pos = IVec3::new(curr_chunk.x + x, 0, curr_chunk.z + z);
-            if chunk_entities.chunks.contains_key(&new_chunk_pos) {
-                continue;
+            for chunk_y in 0..CHUNK_Y_COUNT {
+                let new_chunk_pos = IVec3::new(curr_chunk.x + x, chunk_y, curr_chunk.z + z);
+
+                if chunk_entities.chunks.contains_key(&new_chunk_pos) {
+                    continue;
+                }
+
+                let tx = chunk_channel.sender.clone();
+                AsyncComputeTaskPool::get()
+                    .spawn(async move {
+                        let interior_chunk = generate_no_padding_dumby_chunk(); // <-- pass chunk_y
+                        let mut chunk_views = chunk_view_generator(&interior_chunk);
+                        if let Some(mesh) = generate_mesh(&mut chunk_views, &interior_chunk) {
+                            let _ = tx.send((new_chunk_pos, mesh, interior_chunk));
+                        }
+                    })
+                    .detach();
             }
-
-            AsyncComputeTaskPool::get()
-                .spawn(async move {
-                    let interior_chunk = generate_no_padding_dumby_chunk(); // grab generated chunk at pos
-
-                    let mut chunk_views = chunk_view_generator(&interior_chunk); // add a neighbour function...
-                    if let Some(mesh) = generate_mesh(&mut chunk_views, &interior_chunk) {
-                        let _ = tx.send((new_chunk_pos, mesh, interior_chunk));
-                    }
-                })
-                .detach();
         }
     }
 }
@@ -126,6 +127,7 @@ fn process_chunk_meshes(
     let rx = chunk_channel.receiver.lock().unwrap();
 
     while let Ok((chunk_pos, mesh, voxel_data)) = rx.try_recv() {
+        //have to make this a y 
         let entity = commands
             .spawn((
                 Mesh3d(meshes.add(mesh)),
@@ -137,7 +139,7 @@ fn process_chunk_meshes(
             ))
             .id();
 
-        chunk_entities.chunks.insert(chunk_pos, vec![entity]);
+        chunk_entities.chunks.insert(chunk_pos, vec![entity]); 
         chunk_voxels.chunks.insert(chunk_pos, voxel_data);
     }
 }
