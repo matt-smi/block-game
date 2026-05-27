@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use std::sync::mpsc::channel;
 
 const CHUNK_LOAD_DISTANCE: i32 = 14;
-const CHUNK_Y_COUNT: i32 = 20;
+const CHUNK_Y_COUNT: i32 = 10;
 
 // TODO: Look into using commandQueue instead of mpsc:channel.
 pub struct ChunkHandlerPlugin;
@@ -75,10 +75,12 @@ fn prune_chunks(
         }
         in_bounds
     });
-
+    
     for entity in to_despawn {
-        commands.entity(entity).despawn();
+    if let Ok(mut e) = commands.get_entity(entity) { 
+        e.despawn();
     }
+}
 }
 
 // Maybe in the future make it so nearby chunks like 3x3 are blocking/synchronous to ensure the player is standing on something
@@ -103,7 +105,7 @@ fn load_chunks(
                 let tx = chunk_channel.sender.clone();
                 AsyncComputeTaskPool::get()
                     .spawn(async move {
-                        let interior_chunk = generate_no_padding_dumby_chunk(); // <-- pass chunk_y
+                        let interior_chunk = generate_no_padding_dumby_chunk(); 
                         let mut chunk_views = chunk_view_generator(&interior_chunk);
                         if let Some(mesh) = generate_mesh(&mut chunk_views, &interior_chunk) {
                             let _ = tx.send((new_chunk_pos, mesh, interior_chunk));
@@ -117,6 +119,7 @@ fn load_chunks(
 
 // need to also make colliders async... after since current will always be synchronous, and async will be the close 6 neighbours...
 fn process_chunk_meshes(
+    single: Single<Movement, With<Player>>, 
     chunk_channel: Res<ChunkChannel>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -124,10 +127,18 @@ fn process_chunk_meshes(
     mut chunk_voxels: ResMut<ChunkVoxels>,
     mut commands: Commands,
 ) {
+    let (transform, _, _) = single.into_inner(); 
     let rx = chunk_channel.receiver.lock().unwrap();
+    let curr_chunk = get_chunk_index(transform.translation);
 
     while let Ok((chunk_pos, mesh, voxel_data)) = rx.try_recv() {
-        //have to make this a y 
+
+        let in_bounds = (chunk_pos.x - curr_chunk.x).abs() <= CHUNK_LOAD_DISTANCE
+            && (chunk_pos.z - curr_chunk.z).abs() <= CHUNK_LOAD_DISTANCE;
+        if !in_bounds {
+            continue;
+        }
+
         let entity = commands
             .spawn((
                 Mesh3d(meshes.add(mesh)),
