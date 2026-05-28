@@ -14,7 +14,6 @@ const PLAYER_GRAVITY: f32 = 35.0;
 const PLAYER_SCALE: f32 = 0.5;
 const PLAYER_SPRINT_SPEED: f32 = PLAYER_SPEED * 1.5;
 const PLAYER_HALF_EXTENTS: Vec3 = Vec3::new(0.24, 0.5, 0.24);
-// A slightly slimmer upward sweep avoids snagging on voxel corners during takeoff.
 const PLAYER_UPWARD_HALF_EXTENTS: Vec3 = Vec3::new(0.18, 0.5, 0.18);
 const PLAYER_SKIN_WIDTH: f32 = 0.001;
 const COLLISION_BINARY_STEPS: usize = 10;
