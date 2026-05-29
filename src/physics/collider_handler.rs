@@ -49,10 +49,10 @@ fn prune_colliders(
     mut commands: Commands,
 ) {
     let player_chunk = get_chunk_index(player_transform.single().unwrap().translation);
-    let lower_x = player_chunk.x  - COLLIDER_PRUNE_DISTANCE as i32;
-    let upper_x = player_chunk.x  + COLLIDER_PRUNE_DISTANCE as i32;
-    let lower_z = player_chunk.z  - COLLIDER_PRUNE_DISTANCE as i32;
-    let upper_z = player_chunk.z  + COLLIDER_PRUNE_DISTANCE as i32;
+    let lower_x = player_chunk.x - COLLIDER_PRUNE_DISTANCE as i32;
+    let upper_x = player_chunk.x + COLLIDER_PRUNE_DISTANCE as i32;
+    let lower_z = player_chunk.z - COLLIDER_PRUNE_DISTANCE as i32;
+    let upper_z = player_chunk.z + COLLIDER_PRUNE_DISTANCE as i32;
 
     for (entity, transform) in colliders_transform {
         let curr_chunk = get_chunk_index(transform.translation);
