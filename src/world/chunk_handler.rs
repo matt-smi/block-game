@@ -9,7 +9,7 @@ use bevy::tasks::AsyncComputeTaskPool;
 use std::sync::Mutex;
 use std::sync::mpsc::channel;
 
-const CHUNK_LOAD_DISTANCE: i32 = 14;
+const CHUNK_LOAD_DISTANCE: i32 = 30;
 const CHUNK_Y_COUNT: i32 = 10;
 
 // TODO: Look into using commandQueue instead of mpsc:channel.
@@ -52,6 +52,7 @@ fn chunk_changed(
 }
 
 //curr_chunk: IVec3, chunk_entities: &mut HashMap<IVec3, Vec<Entity>>, maybe make this async too profile it.
+// TODO: look into performance for this
 fn prune_chunks(
     single: Single<Movement, With<Player>>,
     mut chunk_entities: ResMut<ChunkEntities>,
@@ -93,28 +94,32 @@ fn load_chunks(
     let (transform, _, _) = single.into_inner();
     let curr_chunk = get_chunk_index(transform.translation);
 
-    for x in -CHUNK_LOAD_DISTANCE..=CHUNK_LOAD_DISTANCE {
-        for z in -CHUNK_LOAD_DISTANCE..=CHUNK_LOAD_DISTANCE {
-            for chunk_y in 0..CHUNK_Y_COUNT {
-                let new_chunk_pos = IVec3::new(curr_chunk.x + x, chunk_y, curr_chunk.z + z);
+    let mut positions: Vec<IVec3> = (-CHUNK_LOAD_DISTANCE..=CHUNK_LOAD_DISTANCE)
+    .flat_map(|x| {
+        (-CHUNK_LOAD_DISTANCE..=CHUNK_LOAD_DISTANCE)
+            .flat_map(move |z| (0..CHUNK_Y_COUNT).map(move |y| IVec3::new(curr_chunk.x + x, y, curr_chunk.z + z)))
+    })
+    .filter(|pos| !chunk_entities.chunks.contains_key(pos))
+    .collect();
 
-                if chunk_entities.chunks.contains_key(&new_chunk_pos) {
-                    continue;
+    positions.sort_unstable_by_key(|pos| {
+        let dx = pos.x - curr_chunk.x;
+        let dz = pos.z - curr_chunk.z;
+        dx * dx + dz * dz
+    });
+
+    for new_chunk_pos in positions {
+        let tx = chunk_channel.sender.clone();
+        AsyncComputeTaskPool::get()
+            .spawn(async move {
+                let interior_chunk = generate_no_padding_dumby_chunk();
+                let mut chunk_views = chunk_view_generator(&interior_chunk);
+                if let Some(mesh) = generate_mesh(&mut chunk_views, &interior_chunk) {
+                    let _ = tx.send((new_chunk_pos, mesh, interior_chunk));
                 }
-
-                let tx = chunk_channel.sender.clone();
-                AsyncComputeTaskPool::get()
-                    .spawn(async move {
-                        let interior_chunk = generate_no_padding_dumby_chunk(); 
-                        let mut chunk_views = chunk_view_generator(&interior_chunk);
-                        if let Some(mesh) = generate_mesh(&mut chunk_views, &interior_chunk) {
-                            let _ = tx.send((new_chunk_pos, mesh, interior_chunk));
-                        }
-                    })
-                    .detach();
-            }
-        }
-    }
+            })
+            .detach();
+    } 
 }
 
 // need to also make colliders async... after since current will always be synchronous, and async will be the close 6 neighbours...
@@ -130,8 +135,8 @@ fn process_chunk_meshes(
     let (transform, _, _) = single.into_inner(); 
     let rx = chunk_channel.receiver.lock().unwrap();
     let curr_chunk = get_chunk_index(transform.translation);
-
-    while let Ok((chunk_pos, mesh, voxel_data)) = rx.try_recv() {
+    let mut count: u8 = 0;
+    while count < 4 && let Ok((chunk_pos, mesh, voxel_data)) = rx.try_recv() {
 
         let in_bounds = (chunk_pos.x - curr_chunk.x).abs() <= CHUNK_LOAD_DISTANCE
             && (chunk_pos.z - curr_chunk.z).abs() <= CHUNK_LOAD_DISTANCE;
@@ -152,6 +157,7 @@ fn process_chunk_meshes(
 
         chunk_entities.chunks.insert(chunk_pos, vec![entity]); 
         chunk_voxels.chunks.insert(chunk_pos, voxel_data);
+        count += 1;
     }
 }
 //mesh can be generated from points not even mesh needed.
