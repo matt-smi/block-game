@@ -65,7 +65,7 @@ fn spawn_player(
         MeshMaterial3d(handle),
         Transform {
             scale: Vec3::new(PLAYER_SCALE, PLAYER_SCALE, PLAYER_SCALE),
-            translation: Vec3::new(0., 20., 0.),
+            translation: Vec3::new(0., 49., 0.),
             ..default()
         },
         Angles2D {
