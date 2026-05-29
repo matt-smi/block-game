@@ -3,6 +3,7 @@ use crate::world::{
     CHUNK_WORLD_SIZE, ChunkChannel, ChunkEntities, ChunkVoxels, LastChunk, VoxelData,
     chunk_view_generator, chunk_world_origin, generate_mesh, generate_no_padding_dumby_chunk,
 };
+use crate::world::generate_chunk;
 use bevy::ecs::relationship::RelationshipSourceCollection;
 use bevy::prelude::*;
 use bevy::tasks::AsyncComputeTaskPool;
@@ -112,7 +113,7 @@ fn load_chunks(
         let tx = chunk_channel.sender.clone();
         AsyncComputeTaskPool::get()
             .spawn(async move {
-                let interior_chunk = generate_no_padding_dumby_chunk();
+                let interior_chunk = generate_chunk(new_chunk_pos);
                 let mut chunk_views = chunk_view_generator(&interior_chunk);
                 if let Some(mesh) = generate_mesh(&mut chunk_views, &interior_chunk) {
                     let _ = tx.send((new_chunk_pos, mesh, interior_chunk));
