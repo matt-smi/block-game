@@ -13,8 +13,8 @@ const JUMP_VELOCITY: f32 = 15.5;
 const PLAYER_GRAVITY: f32 = 35.0;
 const PLAYER_SCALE: f32 = 0.5;
 const PLAYER_SPRINT_SPEED: f32 = PLAYER_SPEED * 1.5;
-const PLAYER_HALF_EXTENTS: Vec3 = Vec3::new(0.24, 0.5, 0.24);
-const PLAYER_UPWARD_HALF_EXTENTS: Vec3 = Vec3::new(0.18, 0.5, 0.18);
+const PLAYER_HALF_EXTENTS: Vec3 = Vec3::new(0.48, 1.0, 0.48);     
+const PLAYER_UPWARD_HALF_EXTENTS: Vec3 = Vec3::new(0.36, 1.0, 0.36); 
 const PLAYER_SKIN_WIDTH: f32 = 0.001;
 const COLLISION_BINARY_STEPS: usize = 10;
 const COYOTE_TIME: f32 = 0.08;
@@ -50,9 +50,9 @@ fn spawn_player(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let body = meshes.add(Cuboid::new(
-        2. * PLAYER_SCALE,
         4. * PLAYER_SCALE,
-        2. * PLAYER_SCALE,
+        8. * PLAYER_SCALE,
+        4. * PLAYER_SCALE,
     ));
 
     let handle = materials.add(StandardMaterial {

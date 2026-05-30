@@ -9,7 +9,7 @@ use crate::plugins::movement::Movement;
 //use crate::plugins::movement::update_position;
 use crate::plugins::player::Player;
 
-const ORBIT_DISTANCE: f32 = 6.5;
+const ORBIT_DISTANCE: f32 = 13.;
 
 #[derive(Component)]
 pub struct Angles2D {
