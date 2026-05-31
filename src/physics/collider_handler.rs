@@ -1,4 +1,4 @@
-use avian3d::prelude::{Collider, CollisionLayers};
+use avian3d::prelude::{Collider, CollisionLayers, CollisionMargin};
 use bevy::prelude::*;
 
 use crate::physics::{COLLIDER_PRUNE_DISTANCE, Layers};
@@ -33,6 +33,7 @@ fn generate_colliders(
                         commands.entity(entity_id).insert((
                             collider,
                             CollisionLayers::new([Layers::Terrain], [Layers::Player]),
+                            CollisionMargin(0.005),
                         ));
                     }
                 }
@@ -48,10 +49,10 @@ fn prune_colliders(
     mut commands: Commands,
 ) {
     let player_chunk = get_chunk_index(player_transform.single().unwrap().translation);
-    let lower_x = player_chunk.x as i32 - COLLIDER_PRUNE_DISTANCE as i32;
-    let upper_x = player_chunk.x as i32 + COLLIDER_PRUNE_DISTANCE as i32;
-    let lower_z = player_chunk.z as i32 - COLLIDER_PRUNE_DISTANCE as i32;
-    let upper_z = player_chunk.z as i32 + COLLIDER_PRUNE_DISTANCE as i32;
+    let lower_x = player_chunk.x - COLLIDER_PRUNE_DISTANCE as i32;
+    let upper_x = player_chunk.x + COLLIDER_PRUNE_DISTANCE as i32;
+    let lower_z = player_chunk.z - COLLIDER_PRUNE_DISTANCE as i32;
+    let upper_z = player_chunk.z + COLLIDER_PRUNE_DISTANCE as i32;
 
     for (entity, transform) in colliders_transform {
         let curr_chunk = get_chunk_index(transform.translation);

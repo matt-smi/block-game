@@ -1,17 +1,16 @@
 use crate::plugins::{movement::Movement, player::Player};
 use crate::world::{
-    ChunkChannel, ChunkEntities, LastChunk, chunk_view_generator, generate_mesh,
-    generate_no_padding_dumby_chunk,
+    CHUNK_WORLD_SIZE, ChunkChannel, ChunkEntities, ChunkVoxels, LastChunk, VoxelData,
+    chunk_view_generator, chunk_world_origin, generate_mesh, generate_no_padding_dumby_chunk,
 };
-
-use avian3d::prelude::*;
 use bevy::ecs::relationship::RelationshipSourceCollection;
 use bevy::prelude::*;
 use bevy::tasks::AsyncComputeTaskPool;
 use std::sync::Mutex;
 use std::sync::mpsc::channel;
 
-const CHUNK_LOAD_DISTANCE: i32 = 16;
+const CHUNK_LOAD_DISTANCE: i32 = 14;
+const CHUNK_Y_COUNT: i32 = 10;
 
 // TODO: Look into using commandQueue instead of mpsc:channel.
 pub struct ChunkHandlerPlugin;
@@ -30,7 +29,7 @@ impl Plugin for ChunkHandlerPlugin {
 }
 
 fn set_up_chunk_async(mut command: Commands) {
-    let (tx, rx) = channel::<(IVec3, Mesh)>();
+    let (tx, rx) = channel::<(IVec3, Mesh, VoxelData)>();
     command.insert_resource(ChunkChannel {
         sender: tx,
         receiver: Mutex::new(rx),
@@ -56,6 +55,7 @@ fn chunk_changed(
 fn prune_chunks(
     single: Single<Movement, With<Player>>,
     mut chunk_entities: ResMut<ChunkEntities>,
+    mut chunk_voxels: ResMut<ChunkVoxels>,
     mut commands: Commands,
 ) {
     let (transform, _, _) = single.into_inner();
@@ -71,20 +71,21 @@ fn prune_chunks(
 
         if !in_bounds {
             to_despawn.extend(entities.iter());
+            chunk_voxels.chunks.remove(key);
         }
         in_bounds
     });
 
     for entity in to_despawn {
-        commands.entity(entity).despawn();
+        if let Ok(mut e) = commands.get_entity(entity) {
+            e.despawn();
+        }
     }
 }
 
 // Maybe in the future make it so nearby chunks like 3x3 are blocking/synchronous to ensure the player is standing on something
 fn load_chunks(
     single: Single<Movement, With<Player>>,
-    _materials: ResMut<Assets<StandardMaterial>>,
-    _meshes: ResMut<Assets<Mesh>>,
     chunk_channel: Res<ChunkChannel>,
     chunk_entities: Res<ChunkEntities>,
     _commands: Commands,
@@ -94,41 +95,48 @@ fn load_chunks(
 
     for x in -CHUNK_LOAD_DISTANCE..=CHUNK_LOAD_DISTANCE {
         for z in -CHUNK_LOAD_DISTANCE..=CHUNK_LOAD_DISTANCE {
-            let tx = chunk_channel.sender.clone();
-            let new_chunk_pos = IVec3::new(curr_chunk.x + x, 0, curr_chunk.z + z);
-            if chunk_entities.chunks.contains_key(&new_chunk_pos) {
-                continue;
+            for chunk_y in 0..CHUNK_Y_COUNT {
+                let new_chunk_pos = IVec3::new(curr_chunk.x + x, chunk_y, curr_chunk.z + z);
+
+                if chunk_entities.chunks.contains_key(&new_chunk_pos) {
+                    continue;
+                }
+
+                let tx = chunk_channel.sender.clone();
+                AsyncComputeTaskPool::get()
+                    .spawn(async move {
+                        let interior_chunk = generate_no_padding_dumby_chunk();
+                        let mut chunk_views = chunk_view_generator(&interior_chunk);
+                        if let Some(mesh) = generate_mesh(&mut chunk_views, &interior_chunk) {
+                            let _ = tx.send((new_chunk_pos, mesh, interior_chunk));
+                        }
+                    })
+                    .detach();
             }
-
-            AsyncComputeTaskPool::get()
-                .spawn(async move {
-                    let interior_chunk = generate_no_padding_dumby_chunk();
-
-                    let mut chunk_views = chunk_view_generator(&interior_chunk); // add a neighbour function...
-                    if let Some(mesh) = generate_mesh(&mut chunk_views, &interior_chunk) {
-                        let _ = tx.send((new_chunk_pos, mesh));
-                    }
-                })
-                .detach();
         }
     }
 }
 
-// voxelized tri-mesh after... compare performance
 // need to also make colliders async... after since current will always be synchronous, and async will be the close 6 neighbours...
 fn process_chunk_meshes(
+    single: Single<Movement, With<Player>>,
     chunk_channel: Res<ChunkChannel>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut chunk_entities: ResMut<ChunkEntities>,
+    mut chunk_voxels: ResMut<ChunkVoxels>,
     mut commands: Commands,
 ) {
+    let (transform, _, _) = single.into_inner();
     let rx = chunk_channel.receiver.lock().unwrap();
+    let curr_chunk = get_chunk_index(transform.translation);
 
-    // Process all completed chunks this frame
-    while let Ok((chunk_pos, mesh)) = rx.try_recv() {
-        //   let collider = Collider::voxelized_trimesh_from_mesh(&mesh, 0.5, FillMode::SurfaceOnly)
-        // .expect("Failed to create collider from mesh");
+    while let Ok((chunk_pos, mesh, voxel_data)) = rx.try_recv() {
+        let in_bounds = (chunk_pos.x - curr_chunk.x).abs() <= CHUNK_LOAD_DISTANCE
+            && (chunk_pos.z - curr_chunk.z).abs() <= CHUNK_LOAD_DISTANCE;
+        if !in_bounds {
+            continue;
+        }
 
         let entity = commands
             .spawn((
@@ -137,13 +145,12 @@ fn process_chunk_meshes(
                     base_color: Color::srgb(1.0, 1.0, 1.0),
                     ..default()
                 })),
-                Transform::from_xyz(16.0 * chunk_pos.x as f32, 0.0, 16.0 * chunk_pos.z as f32),
-                RigidBody::Static,
-                //collider,
+                Transform::from_translation(chunk_world_origin(chunk_pos)),
             ))
             .id();
 
         chunk_entities.chunks.insert(chunk_pos, vec![entity]);
+        chunk_voxels.chunks.insert(chunk_pos, voxel_data);
     }
 }
 //mesh can be generated from points not even mesh needed.
@@ -156,8 +163,8 @@ fn update_last_chunk(player: Single<&Transform, With<Player>>, mut commands: Com
 
 pub fn get_chunk_index(world_position: Vec3) -> IVec3 {
     IVec3::new(
-        (world_position.x / 16.0).floor() as i32,
+        (world_position.x / CHUNK_WORLD_SIZE).floor() as i32,
         0,
-        (world_position.z / 16.0).floor() as i32,
+        (world_position.z / CHUNK_WORLD_SIZE).floor() as i32,
     )
 }

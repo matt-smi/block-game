@@ -26,6 +26,8 @@ pub const VOXEL_MAPPING: VoxelMapping = VoxelMapping {
 
 pub const CHUNK_DIMENSION: u32 = 32;
 pub const CHUNK_DATA_SIZE: usize = (CHUNK_DIMENSION * CHUNK_DIMENSION * CHUNK_DIMENSION) as usize;
+pub const WORLD_VOXEL_SIZE: f32 = 0.6;
+pub const CHUNK_WORLD_SIZE: f32 = CHUNK_DIMENSION as f32 * WORLD_VOXEL_SIZE;
 
 #[derive(Component)]
 struct _ChunkCoord(IVec3);
@@ -33,6 +35,7 @@ struct _ChunkCoord(IVec3);
 #[derive(Component)]
 pub struct ChunkCoord(pub IVec3);
 
+#[derive(Clone)]
 pub struct VoxelData {
     pub voxels: Vec<VoxelId>,
     pub size: UVec3,
@@ -77,11 +80,15 @@ pub struct ChunkMesh {
     Chunk key is indexed by chunk position. E.g <-2, 0, 10> -> <-2 * CHUNK_SIZE, 0 * CHUNK_SIZE, 10 * CHUNK_SIZE> (world position).
     Also note Y is not used, since the value represents the column at the x, z coordinates.
     Leaving y in here if we want to support chunk layering later on.
-    (TODO: make this a 2D linked-list so it's easier to scan boundary, or introduce some sort of sorting)
 */
 #[derive(Resource)]
 pub struct ChunkEntities {
     pub chunks: HashMap<IVec3, Vec<Entity>>,
+}
+
+#[derive(Resource)]
+pub struct ChunkVoxels {
+    pub chunks: HashMap<IVec3, VoxelData>,
 }
 
 #[derive(Resource)]
@@ -91,6 +98,48 @@ pub struct LastChunk {
 
 #[derive(Resource)]
 pub struct ChunkChannel {
-    pub sender: Sender<(IVec3, Mesh)>,
-    pub receiver: Mutex<Receiver<(IVec3, Mesh)>>,
+    pub sender: Sender<(IVec3, Mesh, VoxelData)>,
+    pub receiver: Mutex<Receiver<(IVec3, Mesh, VoxelData)>>,
+}
+
+pub fn world_to_global_voxel(world_position: Vec3) -> IVec3 {
+    IVec3::new(
+        (world_position.x / WORLD_VOXEL_SIZE).floor() as i32,
+        (world_position.y / WORLD_VOXEL_SIZE).floor() as i32,
+        (world_position.z / WORLD_VOXEL_SIZE).floor() as i32,
+    )
+}
+
+pub fn global_voxel_to_chunk(global_voxel: IVec3) -> (IVec3, UVec3) {
+    let chunk = IVec3::new(
+        global_voxel.x.div_euclid(CHUNK_DIMENSION as i32),
+        global_voxel.y.div_euclid(CHUNK_DIMENSION as i32),
+        global_voxel.z.div_euclid(CHUNK_DIMENSION as i32),
+    );
+    let local = UVec3::new(
+        global_voxel.x.rem_euclid(CHUNK_DIMENSION as i32) as u32,
+        global_voxel.y.rem_euclid(CHUNK_DIMENSION as i32) as u32,
+        global_voxel.z.rem_euclid(CHUNK_DIMENSION as i32) as u32,
+    );
+    (chunk, local)
+}
+
+pub fn voxel_at_global(chunks: &ChunkVoxels, global_voxel: IVec3) -> Option<VoxelId> {
+    let (chunk, local) = global_voxel_to_chunk(global_voxel);
+    chunks
+        .chunks
+        .get(&chunk)
+        .map(|data| data.get(local.x, local.y, local.z))
+}
+
+pub fn is_solid_global_voxel(chunks: &ChunkVoxels, global_voxel: IVec3) -> bool {
+    voxel_at_global(chunks, global_voxel).is_some_and(|voxel| voxel != VoxelId::Air)
+}
+
+pub fn chunk_world_origin(chunk: IVec3) -> Vec3 {
+    Vec3::new(
+        CHUNK_WORLD_SIZE * chunk.x as f32,
+        CHUNK_WORLD_SIZE * chunk.y as f32,
+        CHUNK_WORLD_SIZE * chunk.z as f32,
+    )
 }
