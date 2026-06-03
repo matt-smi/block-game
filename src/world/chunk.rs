@@ -1,6 +1,8 @@
 use bevy::{platform::collections::HashMap, prelude::*};
 use std::sync::Mutex;
 use std::sync::mpsc::{Receiver, Sender};
+use std::cmp::min;
+use std::collections::HashSet;
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -12,7 +14,7 @@ pub enum VoxelId {
 }
 
 pub struct VoxelMapping {
-    pub colours: [[f32; 4]; 4],
+    pub colours: [[f32; 4]; 5],
 }
 
 pub const VOXEL_MAPPING: VoxelMapping = VoxelMapping {
@@ -21,13 +23,18 @@ pub const VOXEL_MAPPING: VoxelMapping = VoxelMapping {
         [0.5, 0.3, 0.2, 1.0], // Dirt
         [0.2, 0.8, 0.2, 1.0], // Grass
         [0.6, 0.6, 0.6, 1.0], // Stone
+        [0.85, 0.78, 0.55, 1.0], // Sand
     ],
 };
 
+
+pub const CHUNK_RENDER_DISTANCE: i32 = 32;
+pub const CHUNK_Y_COUNT: i32 = 10;
 pub const CHUNK_DIMENSION: u32 = 32;
 pub const CHUNK_DATA_SIZE: usize = (CHUNK_DIMENSION * CHUNK_DIMENSION * CHUNK_DIMENSION) as usize;
 pub const WORLD_VOXEL_SIZE: f32 = 1.0;
 pub const CHUNK_WORLD_SIZE: f32 = CHUNK_DIMENSION as f32 * WORLD_VOXEL_SIZE;
+pub const LOD_INTERVAL: u8 = 20; 
 
 #[derive(Component)]
 struct _ChunkCoord(IVec3);
@@ -38,8 +45,17 @@ pub struct ChunkCoord(pub IVec3);
 #[derive(Clone)]
 pub struct VoxelData {
     pub voxels: Vec<VoxelId>,
-    pub size: UVec3,
+    /* 
+    these two fields are easily derivable from voxels size, but I'm going to make it explicit for now
+
+    lod value can be 0-3: 
+        (0 - 24 chunks)        (24 - 48 chunks)      (48 - 72 chunks)     (72 - 96 chunks)
+        lod = 0 -> 32 x 32 x 32, lod = 1 -> 16 x 16 x 16, lod = 2 -> 8 x 8 x 8, lod = 3 -> 4 x 4 x 4 
+        voxel_scale:    1                        2                       4                     8                     
+    */
+    pub lod: u8, 
 }
+
 
 impl VoxelData {
     pub fn index(&self, x: u32, y: u32, z: u32) -> usize {
@@ -65,6 +81,7 @@ impl VoxelData {
             1 => VoxelId::Dirt,
             2 => VoxelId::Grass,
             3 => VoxelId::Stone,
+            4 => VoxelId::Sand,
             _ => VoxelId::Air,
         };
         self.set(x, y, z, voxel);
@@ -98,6 +115,7 @@ pub struct LastChunk {
 
 #[derive(Resource)]
 pub struct ChunkChannel {
+    pub processing_queue: HashSet<IVec3>, // TODO: Make it so processing queue contains (IVec3 + LOD) as key
     pub sender: Sender<(IVec3, Mesh, VoxelData)>,
     pub receiver: Mutex<Receiver<(IVec3, Mesh, VoxelData)>>,
 }
@@ -142,4 +160,11 @@ pub fn chunk_world_origin(chunk: IVec3) -> Vec3 {
         CHUNK_WORLD_SIZE * chunk.y as f32,
         CHUNK_WORLD_SIZE * chunk.z as f32,
     )
+}
+
+pub fn get_lod(curr_chunk: IVec3, target_chunk: IVec3) -> u8 {
+    // Horizontal chunk-grid distance only (player chunk index keeps y = 0).
+    let dx = (curr_chunk.x - target_chunk.x).unsigned_abs();
+    let dz = (curr_chunk.z - target_chunk.z).unsigned_abs();
+    min(((dx + dz) as u8) / LOD_INTERVAL, 4)
 }
