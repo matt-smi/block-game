@@ -14,7 +14,7 @@ pub enum VoxelId {
 }
 
 pub struct VoxelMapping {
-    pub colours: [[f32; 4]; 5],
+    pub colours: [[f32; 4]; 4],
 }
 
 pub const VOXEL_MAPPING: VoxelMapping = VoxelMapping {
@@ -23,7 +23,6 @@ pub const VOXEL_MAPPING: VoxelMapping = VoxelMapping {
         [0.5, 0.3, 0.2, 1.0], // Dirt
         [0.2, 0.8, 0.2, 1.0], // Grass
         [0.6, 0.6, 0.6, 1.0], // Stone
-        [0.85, 0.78, 0.55, 1.0], // Sand
     ],
 };
 
@@ -81,7 +80,6 @@ impl VoxelData {
             1 => VoxelId::Dirt,
             2 => VoxelId::Grass,
             3 => VoxelId::Stone,
-            4 => VoxelId::Sand,
             _ => VoxelId::Air,
         };
         self.set(x, y, z, voxel);

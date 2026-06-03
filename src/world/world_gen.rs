@@ -104,10 +104,10 @@ const STONE_DEPTH: i32 = 4;
 
 /// Replaces `generate_no_padding_dumby_chunk`.
 /// Takes the chunk grid coordinate so every chunk tiles seamlessly.
-pub fn generate_chunk(chunk_pos: IVec3) -> VoxelData {
+pub fn generate_chunk(chunk_pos: IVec3, lod: u8) -> VoxelData {
     let mut chunk = VoxelData {
         voxels: vec![VoxelId::Air; CHUNK_DATA_SIZE],
-        size: bevy::math::UVec3::splat(CHUNK_DIMENSION),
+        lod
     };
 
     let chunk_x = chunk_pos.x;
