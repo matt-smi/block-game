@@ -33,7 +33,9 @@ pub const CHUNK_DIMENSION: u32 = 32;
 pub const CHUNK_DATA_SIZE: usize = (CHUNK_DIMENSION * CHUNK_DIMENSION * CHUNK_DIMENSION) as usize;
 pub const WORLD_VOXEL_SIZE: f32 = 1.0;
 pub const CHUNK_WORLD_SIZE: f32 = CHUNK_DIMENSION as f32 * WORLD_VOXEL_SIZE;
-pub const LOD_INTERVAL: u8 = 20; 
+pub const LOD_INTERVAL: u8 = 20;
+/// Max chunk-grid steps the player may move between LOD refresh passes (fast movement).
+pub const LOD_UPDATE_BUFFER: u32 = 3;
 
 #[derive(Component)]
 struct _ChunkCoord(IVec3);
@@ -160,9 +162,32 @@ pub fn chunk_world_origin(chunk: IVec3) -> Vec3 {
     )
 }
 
-pub fn get_lod(curr_chunk: IVec3, target_chunk: IVec3) -> u8 {
-    // Horizontal chunk-grid distance only (player chunk index keeps y = 0).
+/// Horizontal chunk-grid distance used for LOD (dx + dz; player chunk keeps y = 0).
+pub fn chunk_lod_distance(curr_chunk: IVec3, target_chunk: IVec3) -> u32 {
     let dx = (curr_chunk.x - target_chunk.x).unsigned_abs();
     let dz = (curr_chunk.z - target_chunk.z).unsigned_abs();
-    min(((dx + dz) as u8) / LOD_INTERVAL, 4)
+    dx + dz
+}
+
+pub fn get_lod_from_distance(distance: u32) -> u8 {
+    min((distance as u8) / LOD_INTERVAL, 3)
+}
+
+pub fn get_lod(curr_chunk: IVec3, target_chunk: IVec3) -> u8 {
+    get_lod_from_distance(chunk_lod_distance(curr_chunk, target_chunk))
+}
+
+/// True if LOD could change after the player moves up to `movement_buffer` chunk steps.
+///
+/// Only distances near rings at 20, 40, 60 (LOD_INTERVAL) can cross a level; chunks farther
+/// out stay in the same band until the player moves enough to widen the band.
+pub fn lod_may_change_after_move(distance: u32, movement_buffer: u32) -> bool {
+    let interval = LOD_INTERVAL as u32;
+    for ring in 1..=3 {
+        let boundary = ring * interval;
+        if distance + movement_buffer >= boundary && distance.saturating_sub(movement_buffer) <= boundary {
+            return true;
+        }
+    }
+    false
 }

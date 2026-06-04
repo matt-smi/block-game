@@ -1,7 +1,8 @@
 use crate::plugins::{movement::Movement, player::Player};
 use crate::world::{
-    CHUNK_WORLD_SIZE, CHUNK_Y_COUNT, CHUNK_RENDER_DISTANCE, ChunkChannel, ChunkEntities, ChunkVoxels, LastChunk, VoxelData,
-    chunk_view_generator, chunk_world_origin, generate_mesh, get_lod 
+    CHUNK_WORLD_SIZE, CHUNK_Y_COUNT, CHUNK_RENDER_DISTANCE, ChunkChannel, ChunkEntities, ChunkVoxels,
+    LastChunk, VoxelData, chunk_view_generator, chunk_world_origin, generate_mesh, get_lod,
+    chunk_lod_distance, lod_may_change_after_move, LOD_UPDATE_BUFFER,
 };
 use crate::world::generate_chunk;
 use bevy::ecs::relationship::RelationshipSourceCollection;
@@ -10,7 +11,6 @@ use bevy::tasks::AsyncComputeTaskPool;
 use std::sync::Mutex;
 use std::sync::mpsc::channel;
 use std::collections::HashSet;
-use tokio::time::Instant;
 
 // TODO: Look into using commandQueue instead of mpsc:channel.
 pub struct ChunkHandlerPlugin;
@@ -20,7 +20,9 @@ impl Plugin for ChunkHandlerPlugin {
         app.add_systems(
             Update,
             (
-                (load_chunks, prune_chunks).chain().run_if(chunk_changed),
+                (prune_chunks, update_chunk_lods, load_chunks)
+                    .chain()
+                    .run_if(chunk_changed),
                 process_chunk_meshes,
             ),
         );
@@ -87,6 +89,47 @@ fn prune_chunks(
 }
 }
 
+fn update_chunk_lods(
+    single: Single<Movement, With<Player>>,
+    mut chunk_channel: ResMut<ChunkChannel>,
+    mut chunk_entities: ResMut<ChunkEntities>,
+    mut chunk_voxels: ResMut<ChunkVoxels>,
+    mut commands: Commands,
+) {
+    let (transform, _, _) = single.into_inner();
+    let curr_chunk = get_chunk_index(transform.translation);
+
+    let to_remesh: Vec<(IVec3, u8)> = chunk_voxels
+        .chunks
+        .iter()
+        .filter_map(|(&pos, voxel_data)| {
+            let distance = chunk_lod_distance(curr_chunk, pos);
+            if !lod_may_change_after_move(distance, LOD_UPDATE_BUFFER) {
+                return None;
+            }
+            let desired_lod = get_lod(curr_chunk, pos);
+            if desired_lod == voxel_data.lod {
+                None
+            } else {
+                Some((pos, desired_lod))
+            }
+        })
+        .collect();
+
+    for (pos, lod) in to_remesh {
+        if let Some(entities) = chunk_entities.chunks.remove(&pos) {
+            for entity in entities {
+                if let Ok(mut entity) = commands.get_entity(entity) {
+                    entity.despawn();
+                }
+            }
+        }
+        chunk_voxels.chunks.remove(&pos);
+        chunk_channel.processing_queue.remove(&pos);
+        queue_chunk_mesh(&mut chunk_channel, pos, lod);
+    }
+}
+
 // Maybe in the future make it so nearby chunks like 3x3 are blocking/synchronous to ensure the player is standing on something
 fn load_chunks(
     single: Single<Movement, With<Player>>,
@@ -114,24 +157,25 @@ fn load_chunks(
     });
 
     for (new_chunk_pos, lod) in positions {
-        let tx = chunk_channel.sender.clone();
-        if chunk_channel.processing_queue.contains(&new_chunk_pos){ 
-            continue
-        }
-        chunk_channel.processing_queue.insert(new_chunk_pos);
-        AsyncComputeTaskPool::get()
-            .spawn(async move {
-                //let start = Instant::now();
-                let interior_chunk = generate_chunk(new_chunk_pos, lod); 
-                let mut chunk_views = chunk_view_generator(&interior_chunk); 
-                if let Some(mesh) = generate_mesh(&mut chunk_views, &interior_chunk) { 
-                    let _ = tx.send((new_chunk_pos, mesh, interior_chunk));
-                }
-                // let elapsed = start.elapsed();
-                // debug!("Meshed chunk in {:.3?}", elapsed);
-            })
-            .detach();
-    } 
+        queue_chunk_mesh(&mut chunk_channel, new_chunk_pos, lod);
+    }
+}
+
+fn queue_chunk_mesh(chunk_channel: &mut ChunkChannel, chunk_pos: IVec3, lod: u8) {
+    if chunk_channel.processing_queue.contains(&chunk_pos) {
+        return;
+    }
+    chunk_channel.processing_queue.insert(chunk_pos);
+    let tx = chunk_channel.sender.clone();
+    AsyncComputeTaskPool::get()
+        .spawn(async move {
+            let interior_chunk = generate_chunk(chunk_pos, lod);
+            let mut chunk_views = chunk_view_generator(&interior_chunk);
+            if let Some(mesh) = generate_mesh(&mut chunk_views, &interior_chunk) {
+                let _ = tx.send((chunk_pos, mesh, interior_chunk));
+            }
+        })
+        .detach();
 }
 
 // need to also make colliders async... after since current will always be synchronous, and async will be the close 6 neighbours...
@@ -159,7 +203,14 @@ fn process_chunk_meshes(
         let in_bounds = (chunk_pos.x - curr_chunk.x).abs() <= CHUNK_RENDER_DISTANCE
             && (chunk_pos.z - curr_chunk.z).abs() <= CHUNK_RENDER_DISTANCE;
 
-        if !in_bounds || chunk_entities.chunks.contains_key(&chunk_pos){ 
+        if !in_bounds || chunk_entities.chunks.contains_key(&chunk_pos) {
+            chunk_channel.processing_queue.remove(&chunk_pos);
+            continue;
+        }
+
+        let expected_lod = get_lod(curr_chunk, chunk_pos);
+        if voxel_data.lod != expected_lod {
+            chunk_channel.processing_queue.remove(&chunk_pos);
             continue;
         }
 
