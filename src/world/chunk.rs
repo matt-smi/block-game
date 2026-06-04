@@ -113,11 +113,23 @@ pub struct LastChunk {
     pub chunk_pos: IVec3,
 }
 
+#[derive(Clone, Copy)]
+pub struct ChunkLoadInfo {
+    pub pos: IVec3,
+    pub is_replacing: bool,
+}
+
+/// Old mesh entities kept alive until a replacement LOD mesh is ready to spawn.
+#[derive(Resource, Default)]
+pub struct ToBeInvalidatedChunks {
+    pub chunks: HashMap<IVec3, Vec<Entity>>,
+}
+
 #[derive(Resource)]
 pub struct ChunkChannel {
     pub processing_queue: HashSet<IVec3>, // TODO: Make it so processing queue contains (IVec3 + LOD) as key
-    pub sender: Sender<(IVec3, Mesh, VoxelData)>,
-    pub receiver: Mutex<Receiver<(IVec3, Mesh, VoxelData)>>,
+    pub sender: Sender<(ChunkLoadInfo, Mesh, VoxelData)>,
+    pub receiver: Mutex<Receiver<(ChunkLoadInfo, Mesh, VoxelData)>>,
 }
 
 pub fn world_to_global_voxel(world_position: Vec3) -> IVec3 {

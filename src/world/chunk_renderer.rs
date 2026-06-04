@@ -22,7 +22,8 @@ impl Plugin for WorldPlugin {
         })
         .insert_resource(ChunkVoxels {
             chunks: HashMap::new(),
-        });
+        })
+        .init_resource::<ToBeInvalidatedChunks>();
     }
 }
 
