@@ -10,13 +10,18 @@ use crate::world::*;
 /*
 TODOs for chunk system:
     should make it so mesh doesnt go outside of chunk (can happen if near boundary and lod scaling is used)
-    all chunks outside of 32 should be transient load and get rid of 
+    all chunks outside of 32 should be transient load and get rid of
     1. Boundary chunk face culling
     2. World oct-tree (potentially vary compression as well for voxelData)
 */
+/// Single material for all terrain chunks (vertex colors carry per-voxel tint).
+#[derive(Resource)]
+pub struct TerrainMaterial(pub Handle<StandardMaterial>);
+
 pub struct WorldPlugin;
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
+        app.add_systems(Startup, init_terrain_material);
         app.insert_resource(ChunkEntities {
             chunks: HashMap::new(),
         })
@@ -25,6 +30,14 @@ impl Plugin for WorldPlugin {
         })
         .init_resource::<ToBeInvalidatedChunks>();
     }
+}
+
+fn init_terrain_material(mut commands: Commands, mut materials: ResMut<Assets<StandardMaterial>>) {
+    let handle = materials.add(StandardMaterial {
+        base_color: Color::WHITE,
+        ..default()
+    });
+    commands.insert_resource(TerrainMaterial(handle));
 }
 
 #[derive(Resource)]
@@ -76,17 +89,18 @@ fn lod_mesh_params(lod: u8) -> LodMeshParams {
     }
 }
 
-fn macro_cell_solid(chunk: &VoxelData, mx: u32, my: u32, mz: u32, scale: u32) -> bool {
+fn macro_cell_material_id(chunk: &VoxelData, mx: u32, my: u32, mz: u32, scale: u32) -> u8 {
     for dz in 0..scale {
         for dy in 0..scale {
             for dx in 0..scale {
-                if chunk.get_id(mx * scale + dx, my * scale + dy, mz * scale + dz) != 0 {
-                    return true;
+                let id = chunk.get_id(mx * scale + dx, my * scale + dy, mz * scale + dz);
+                if id != 0 {
+                    return id;
                 }
             }
         }
     }
-    false
+    0
 }
 
 /// Contains face visibility data for each direction.
@@ -99,6 +113,9 @@ pub struct ChunkViews {
     neg_x_faces: [[u32; CHUNK_DIMENSION as usize]; CHUNK_DIMENSION as usize],
     neg_z_faces: [[u32; CHUNK_DIMENSION as usize]; CHUNK_DIMENSION as usize],
     neg_y_faces: [[u32; CHUNK_DIMENSION as usize]; CHUNK_DIMENSION as usize],
+    /// First non-air material id per macro-cell (dim³).
+    macro_materials:
+        [[[u8; CHUNK_DIMENSION as usize]; CHUNK_DIMENSION as usize]; CHUNK_DIMENSION as usize],
 }
 
 pub fn chunk_view_generator(chunk: &VoxelData) -> ChunkViews {
@@ -120,15 +137,19 @@ pub fn chunk_view_generator(chunk: &VoxelData) -> ChunkViews {
     let mut solid_x = [[0u32; CHUNK_DIMENSION as usize]; CHUNK_DIMENSION as usize];
     let mut solid_y = [[0u32; CHUNK_DIMENSION as usize]; CHUNK_DIMENSION as usize];
     let mut solid_z = [[0u32; CHUNK_DIMENSION as usize]; CHUNK_DIMENSION as usize];
+    let mut macro_materials =
+        [[[0u8; CHUNK_DIMENSION as usize]; CHUNK_DIMENSION as usize]; CHUNK_DIMENSION as usize];
 
-    // Single pass: build all 3 solid column buffers
+    // Single pass: build all 3 solid column buffers + macro-cell materials
     for x in 0..dim {
         for y in 0..dim {
             for z in 0..dim {
-                if macro_cell_solid(chunk, x as u32, y as u32, z as u32, scale) {
+                let material = macro_cell_material_id(chunk, x as u32, y as u32, z as u32, scale);
+                if material != 0 {
                     solid_x[y][z] |= 1u32 << x;
                     solid_y[x][z] |= 1u32 << y;
                     solid_z[y][x] |= 1u32 << z;
+                    macro_materials[x][y][z] = material;
                 }
             }
         }
@@ -166,6 +187,7 @@ pub fn chunk_view_generator(chunk: &VoxelData) -> ChunkViews {
         neg_x_faces,
         neg_z_faces,
         neg_y_faces,
+        macro_materials,
     }
 }
 
@@ -180,8 +202,10 @@ fn emit_quads(
 ) {
     let u_start_f = params.u_start as f32 * lod_scale as f32 * WORLD_VOXEL_SIZE;
     let v_start_f = params.v_start as f32 * lod_scale as f32 * WORLD_VOXEL_SIZE;
-    let u_end_f = (params.u_start + params.u_dimension) as f32 * lod_scale as f32 * WORLD_VOXEL_SIZE;
-    let v_end_f = (params.v_start + params.v_dimension) as f32 * lod_scale as f32 * WORLD_VOXEL_SIZE;
+    let u_end_f =
+        (params.u_start + params.u_dimension) as f32 * lod_scale as f32 * WORLD_VOXEL_SIZE;
+    let v_end_f =
+        (params.v_start + params.v_dimension) as f32 * lod_scale as f32 * WORLD_VOXEL_SIZE;
 
     // Match pre-LOD convention: +normal at depth·scale, −normal at (depth+1)·scale.
     let depth_f = params.depth as f32 * lod_scale as f32 * WORLD_VOXEL_SIZE;
@@ -267,21 +291,17 @@ fn get_voxel_position(curr_u: u32, curr_v: u32, basis: Basis, normal: Vec3, dept
     )
 }
 
-fn macro_cell_material_id(chunk: &VoxelData, macro_pos: Vec3, lod_scale: u32) -> u8 {
-    let mx = macro_pos.x as u32;
-    let my = macro_pos.y as u32;
-    let mz = macro_pos.z as u32;
-    for dz in 0..lod_scale {
-        for dy in 0..lod_scale {
-            for dx in 0..lod_scale {
-                let id = chunk.get_id(mx * lod_scale + dx, my * lod_scale + dy, mz * lod_scale + dz);
-                if id != 0 {
-                    return id;
-                }
-            }
-        }
-    }
-    0
+fn macro_material_at(
+    materials: &[[[u8; CHUNK_DIMENSION as usize]; CHUNK_DIMENSION as usize];
+         CHUNK_DIMENSION as usize],
+    u: u32,
+    v: u32,
+    depth: u32,
+    basis: Basis,
+    normal: Vec3,
+) -> u8 {
+    let pos = get_voxel_position(u, v, basis, normal, depth);
+    materials[pos.x as usize][pos.y as usize][pos.z as usize]
 }
 
 /// TODO: Do trailing one pruning, so we no longer need to precompute faces + we can then generate views in one loop...
@@ -290,7 +310,8 @@ fn greedy_mesher(
     face: &mut [[u32; CHUNK_DIMENSION as usize]; CHUNK_DIMENSION as usize],
     buffers: &mut MeshBuffers,
     face_params: FaceParams,
-    chunk: &VoxelData,
+    macro_materials: &[[[u8; CHUNK_DIMENSION as usize]; CHUNK_DIMENSION as usize];
+         CHUNK_DIMENSION as usize],
     params: &LodMeshParams,
 ) {
     let dim = params.chunk_dimension;
@@ -301,14 +322,14 @@ fn greedy_mesher(
                 let u_start = u;
                 let v_start = v;
 
-                let initial_pos = get_voxel_position(
+                let curr_id = macro_material_at(
+                    macro_materials,
                     u_start,
                     v_start,
+                    depth,
                     face_params.basis,
                     face_params.normal,
-                    depth,
                 );
-                let curr_id = macro_cell_material_id(chunk, initial_pos, params.lod_scale);
 
                 face[u as usize][v as usize] ^= 1u32 << depth;
 
@@ -316,14 +337,14 @@ fn greedy_mesher(
                 let mut curr_v = v + 1;
 
                 while curr_v < dim && ((face[u as usize][curr_v as usize] >> depth) & 1) == 1 {
-                    let check_pos = get_voxel_position(
+                    let check_id = macro_material_at(
+                        macro_materials,
                         u_start,
                         curr_v,
+                        depth,
                         face_params.basis,
                         face_params.normal,
-                        depth,
                     );
-                    let check_id = macro_cell_material_id(chunk, check_pos, params.lod_scale);
 
                     if check_id != curr_id {
                         break;
@@ -343,14 +364,14 @@ fn greedy_mesher(
                             break 'outer;
                         }
 
-                        let check_pos = get_voxel_position(
+                        let check_id = macro_material_at(
+                            macro_materials,
                             curr_u,
                             check_v,
+                            depth,
                             face_params.basis,
                             face_params.normal,
-                            depth,
                         );
-                        let check_id = macro_cell_material_id(chunk, check_pos, params.lod_scale);
 
                         if check_id != curr_id {
                             break 'outer;
@@ -452,12 +473,13 @@ pub fn generate_mesh(chunk_views: &mut ChunkViews, chunk: &VoxelData) -> Option<
         base_idx: &mut base_idx,
     };
 
+    let macro_materials = &chunk_views.macro_materials;
     for (face, normal, basis) in faces {
         greedy_mesher(
             face,
             &mut buffers,
             FaceParams { normal, basis },
-            chunk,
+            macro_materials,
             &mesh_params,
         );
     }

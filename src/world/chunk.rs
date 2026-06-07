@@ -1,8 +1,7 @@
 use bevy::{platform::collections::HashMap, prelude::*};
+use std::cmp::min;
 use std::sync::Mutex;
 use std::sync::mpsc::{Receiver, Sender};
-use std::cmp::min;
-use std::collections::HashSet;
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,7 +25,6 @@ pub const VOXEL_MAPPING: VoxelMapping = VoxelMapping {
     ],
 };
 
-
 pub const CHUNK_RENDER_DISTANCE: i32 = 32;
 pub const CHUNK_Y_COUNT: i32 = 10;
 pub const CHUNK_DIMENSION: u32 = 32;
@@ -34,8 +32,6 @@ pub const CHUNK_DATA_SIZE: usize = (CHUNK_DIMENSION * CHUNK_DIMENSION * CHUNK_DI
 pub const WORLD_VOXEL_SIZE: f32 = 1.0;
 pub const CHUNK_WORLD_SIZE: f32 = CHUNK_DIMENSION as f32 * WORLD_VOXEL_SIZE;
 pub const LOD_INTERVAL: u8 = 20;
-/// Max chunk-grid steps the player may move between LOD refresh passes (fast movement).
-pub const LOD_UPDATE_BUFFER: u32 = 3;
 
 #[derive(Component)]
 struct _ChunkCoord(IVec3);
@@ -46,17 +42,16 @@ pub struct ChunkCoord(pub IVec3);
 #[derive(Clone)]
 pub struct VoxelData {
     pub voxels: Vec<VoxelId>,
-    /* 
+    /*
     these two fields are easily derivable from voxels size, but I'm going to make it explicit for now
 
-    lod value can be 0-3: 
+    lod value can be 0-3:
         (0 - 24 chunks)        (24 - 48 chunks)      (48 - 72 chunks)     (72 - 96 chunks)
-        lod = 0 -> 32 x 32 x 32, lod = 1 -> 16 x 16 x 16, lod = 2 -> 8 x 8 x 8, lod = 3 -> 4 x 4 x 4 
-        voxel_scale:    1                        2                       4                     8                     
+        lod = 0 -> 32 x 32 x 32, lod = 1 -> 16 x 16 x 16, lod = 2 -> 8 x 8 x 8, lod = 3 -> 4 x 4 x 4
+        voxel_scale:    1                        2                       4                     8
     */
-    pub lod: u8, 
+    pub lod: u8,
 }
-
 
 impl VoxelData {
     pub fn index(&self, x: u32, y: u32, z: u32) -> usize {
@@ -74,6 +69,10 @@ impl VoxelData {
 
     pub fn get_id(&self, x: u32, y: u32, z: u32) -> u8 {
         self.get(x, y, z) as u8
+    }
+
+    pub fn is_solid(&self, x: u32, y: u32, z: u32) -> bool {
+        self.get(x, y, z) != VoxelId::Air
     }
 
     pub fn set_id(&mut self, x: u32, y: u32, z: u32, id: u8) {
@@ -116,7 +115,13 @@ pub struct LastChunk {
 #[derive(Clone, Copy)]
 pub struct ChunkLoadInfo {
     pub pos: IVec3,
+    pub lod: u8,
     pub is_replacing: bool,
+}
+
+#[derive(Clone, Copy)]
+pub struct ProcessingChunk {
+    pub lod: u8,
 }
 
 /// Old mesh entities kept alive until a replacement LOD mesh is ready to spawn.
@@ -127,9 +132,9 @@ pub struct ToBeInvalidatedChunks {
 
 #[derive(Resource)]
 pub struct ChunkChannel {
-    pub processing_queue: HashSet<IVec3>, // TODO: Make it so processing queue contains (IVec3 + LOD) as key
-    pub sender: Sender<(ChunkLoadInfo, Mesh, VoxelData)>,
-    pub receiver: Mutex<Receiver<(ChunkLoadInfo, Mesh, VoxelData)>>,
+    pub processing_queue: HashMap<IVec3, ProcessingChunk>,
+    pub sender: Sender<(ChunkLoadInfo, Option<Mesh>, VoxelData)>,
+    pub receiver: Mutex<Receiver<(ChunkLoadInfo, Option<Mesh>, VoxelData)>>,
 }
 
 pub fn world_to_global_voxel(world_position: Vec3) -> IVec3 {
@@ -187,19 +192,4 @@ pub fn get_lod_from_distance(distance: u32) -> u8 {
 
 pub fn get_lod(curr_chunk: IVec3, target_chunk: IVec3) -> u8 {
     get_lod_from_distance(chunk_lod_distance(curr_chunk, target_chunk))
-}
-
-/// True if LOD could change after the player moves up to `movement_buffer` chunk steps.
-///
-/// Only distances near rings at 20, 40, 60 (LOD_INTERVAL) can cross a level; chunks farther
-/// out stay in the same band until the player moves enough to widen the band.
-pub fn lod_may_change_after_move(distance: u32, movement_buffer: u32) -> bool {
-    let interval = LOD_INTERVAL as u32;
-    for ring in 1..=3 {
-        let boundary = ring * interval;
-        if distance + movement_buffer >= boundary && distance.saturating_sub(movement_buffer) <= boundary {
-            return true;
-        }
-    }
-    false
 }
