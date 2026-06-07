@@ -3,7 +3,7 @@ use crate::world::generate_chunk;
 use crate::world::{
     CHUNK_RENDER_DISTANCE, CHUNK_WORLD_SIZE, CHUNK_Y_COUNT, ChunkChannel, ChunkEntities,
     ChunkLoadInfo, ChunkVoxels, LastChunk, ProcessingChunk, TerrainMaterial, ToBeInvalidatedChunks,
-    VoxelData, chunk_view_generator, chunk_world_origin, generate_mesh, get_lod,
+    VoxelData, chunk_view_generator, chunk_world_origin, generate_mesh, get_lod, xz_chunk_manhattan_distance
 };
 use bevy::ecs::relationship::RelationshipSourceCollection;
 use bevy::platform::collections::HashMap;
@@ -18,11 +18,17 @@ use std::sync::mpsc::channel;
     with chunks that are invalid before they even mesh and increase the delay for chunk loading near the player
     (we could probably use a better system but I think this is probably good enough for now)
 */
-const CHUNKS_TO_QUEUE_PER_FRAME: usize = 3;
+const CHUNKS_TO_QUEUE_PER_FRAME: usize = 6;
+const SYNC_CHUNK_DISTANCE: u32 = 1;
 
 #[derive(Resource, Default)]
 struct PendingChunkLoads {
     queue: Vec<(IVec3, u8)>,
+}
+
+#[derive(Resource, Default)]
+struct SynchronousChunkLoads {
+    queue: Vec<(ChunkLoadInfo, Option<Mesh>, VoxelData)>,
 }
 
 // TODO: Look into using commandQueue instead of mpsc:channel.
@@ -31,15 +37,17 @@ impl Plugin for ChunkHandlerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, set_up_chunk_async);
         app.init_resource::<PendingChunkLoads>();
+        app.init_resource::<SynchronousChunkLoads>();
         app.add_systems(
             Update,
             (
                 (prune_chunks, update_chunk_lods)
                     .chain()
                     .run_if(chunk_changed),
-            refill_pending_chunk_loads.run_if(chunk_changed),
+                refill_pending_chunk_loads.run_if(chunk_changed),
+                load_synchronous_chunks.run_if(chunk_changed),
                 load_chunks,
-                process_chunk_meshes,
+                process_chunk_meshes.after(load_synchronous_chunks),
             ),
         );
         app.add_systems(PostUpdate, update_last_chunk);
@@ -158,6 +166,7 @@ fn update_chunk_lods(
     }
 }
 
+// TODO: look into performance of this
 fn build_pending_queue(
     curr_chunk: IVec3,
     chunk_entities: &ChunkEntities,
@@ -267,6 +276,55 @@ fn queue_chunk_mesh(
         .detach();
 }
 
+fn load_synchronous_chunks(
+    single: Single<Movement, With<Player>>,
+    mut chunk_channel: ResMut<ChunkChannel>,
+    mut synchronous_loads: ResMut<SynchronousChunkLoads>,
+    chunk_entities: Res<ChunkEntities>,
+    to_be_invalidated: Res<ToBeInvalidatedChunks>,
+) {
+    let (transform, _, _) = single.into_inner();
+    let curr_chunk = get_chunk_index(transform.translation);
+
+    for chunk_pos in synchronous_chunk_positions(curr_chunk) {
+        if chunk_entities.chunks.contains_key(&chunk_pos)
+            && !to_be_invalidated.chunks.contains_key(&chunk_pos)
+        {
+            continue;
+        }
+
+        let load_info = ChunkLoadInfo {
+            pos: chunk_pos,
+            lod: 0,
+            is_replacing: to_be_invalidated.chunks.contains_key(&chunk_pos),
+        };
+
+        chunk_channel
+            .processing_queue
+            .insert(chunk_pos, ProcessingChunk { lod: load_info.lod });
+
+        let interior_chunk = generate_chunk(chunk_pos, load_info.lod);
+        let mut chunk_views = chunk_view_generator(&interior_chunk);
+        let mesh = generate_mesh(&mut chunk_views, &interior_chunk);
+        synchronous_loads
+            .queue
+            .push((load_info, mesh, interior_chunk));
+    }
+}
+
+fn synchronous_chunk_positions(curr_chunk: IVec3) -> impl Iterator<Item = IVec3> {
+    let distance = SYNC_CHUNK_DISTANCE as i32;
+    (-distance..=distance).flat_map(move |x| {
+        (-distance..=distance).flat_map(move |y| {
+            (-distance..=distance).filter_map(move |z| {
+                let chunk_pos = IVec3::new(curr_chunk.x + x, curr_chunk.y + y, curr_chunk.z + z);
+                (xz_chunk_manhattan_distance(curr_chunk, chunk_pos) <= SYNC_CHUNK_DISTANCE)
+                    .then_some(chunk_pos)
+            })
+        })
+    })
+}
+
 fn process_chunk_meshes(
     single: Single<Movement, With<Player>>,
     mut chunk_channel: ResMut<ChunkChannel>,
@@ -275,15 +333,18 @@ fn process_chunk_meshes(
     mut chunk_entities: ResMut<ChunkEntities>,
     mut chunk_voxels: ResMut<ChunkVoxels>,
     mut to_be_invalidated: ResMut<ToBeInvalidatedChunks>,
+    mut synchronous_loads: ResMut<SynchronousChunkLoads>,
     mut commands: Commands,
 ) {
     let (transform, _, _) = single.into_inner();
     let curr_chunk = get_chunk_index(transform.translation);
 
-    let received: Vec<_> = {
+    let mut received: Vec<_> = synchronous_loads.queue.drain(..).collect();
+    let async_received: Vec<_> = {
         let rx = chunk_channel.receiver.lock().unwrap();
         (0..8).map_while(|_| rx.try_recv().ok()).collect()
     };
+    received.extend(async_received);
 
     for (load_info, mesh, voxel_data) in received {
         let chunk_pos = load_info.pos;

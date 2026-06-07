@@ -180,7 +180,7 @@ pub fn chunk_world_origin(chunk: IVec3) -> Vec3 {
 }
 
 /// Horizontal chunk-grid distance used for LOD (dx + dz; player chunk keeps y = 0).
-pub fn chunk_lod_distance(curr_chunk: IVec3, target_chunk: IVec3) -> u32 {
+pub fn xz_chunk_manhattan_distance(curr_chunk: IVec3, target_chunk: IVec3) -> u32 {
     let dx = (curr_chunk.x - target_chunk.x).unsigned_abs();
     let dz = (curr_chunk.z - target_chunk.z).unsigned_abs();
     dx + dz
@@ -191,5 +191,5 @@ pub fn get_lod_from_distance(distance: u32) -> u8 {
 }
 
 pub fn get_lod(curr_chunk: IVec3, target_chunk: IVec3) -> u8 {
-    get_lod_from_distance(chunk_lod_distance(curr_chunk, target_chunk))
+    get_lod_from_distance(xz_chunk_manhattan_distance(curr_chunk, target_chunk))
 }
