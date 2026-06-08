@@ -1,5 +1,6 @@
 use bevy::{platform::collections::HashMap, prelude::*};
-use std::cmp::min;
+use std::cmp::{Ordering, min};
+use std::collections::BinaryHeap;
 use std::sync::Mutex;
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -117,14 +118,118 @@ pub struct ChunkLoadInfo {
     pub pos: IVec3,
     pub lod: u8,
     pub is_replacing: bool,
+    pub job_id: u64,
 }
 
 #[derive(Clone, Copy)]
-pub struct ProcessingChunk {
+pub struct RunningChunkJob {
     pub lod: u8,
+    pub job_id: u64,
+    pub is_replacing: bool,
 }
 
-/// Old mesh entities kept alive until a replacement LOD mesh is ready to spawn.
+#[derive(Clone, Copy)]
+pub struct ChunkTaskRequest {
+    pub pos: IVec3,
+    pub lod: u8,
+    pub is_replacing: bool,
+    pub job_id: u64,
+    pub priority: i32,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub struct QueuedChunkJob {
+    pub pos: IVec3,
+    pub lod: u8,
+    pub is_replacing: bool,
+    pub job_id: u64,
+    pub priority: i32,
+}
+
+impl Ord for QueuedChunkJob {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.priority
+            .cmp(&other.priority)
+            .then_with(|| self.job_id.cmp(&other.job_id))
+    }
+}
+
+impl PartialOrd for QueuedChunkJob {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+#[derive(Resource, Default)]
+pub struct ChunkScheduler {
+    pub next_job_id: u64,
+    pub pending: BinaryHeap<QueuedChunkJob>,
+    pub latest: HashMap<IVec3, ChunkTaskRequest>,
+    pub in_flight: HashMap<IVec3, RunningChunkJob>,
+}
+
+impl ChunkScheduler {
+    pub fn request(
+        &mut self,
+        pos: IVec3,
+        lod: u8,
+        is_replacing: bool,
+        curr_chunk: IVec3,
+    ) -> ChunkTaskRequest {
+        self.next_job_id += 1;
+        let priority = chunk_priority(curr_chunk, pos, is_replacing);
+        let request = ChunkTaskRequest {
+            pos,
+            lod,
+            is_replacing,
+            job_id: self.next_job_id,
+            priority,
+        };
+        self.latest.insert(pos, request);
+        self.pending.push(QueuedChunkJob {
+            pos,
+            lod,
+            is_replacing,
+            job_id: request.job_id,
+            priority,
+        });
+        request
+    }
+
+    pub fn pop_next_valid(&mut self, curr_chunk: IVec3) -> Option<ChunkTaskRequest> {
+        while let Some(entry) = self.pending.pop() {
+            let Some(mut latest) = self.latest.get(&entry.pos).copied() else {
+                continue;
+            };
+            if latest.job_id != entry.job_id || self.in_flight.contains_key(&entry.pos) {
+                continue;
+            }
+            latest.priority = chunk_priority(curr_chunk, latest.pos, latest.is_replacing);
+            if latest.priority != entry.priority {
+                self.latest.insert(entry.pos, latest);
+                self.pending.push(QueuedChunkJob {
+                    pos: latest.pos,
+                    lod: latest.lod,
+                    is_replacing: latest.is_replacing,
+                    job_id: latest.job_id,
+                    priority: latest.priority,
+                });
+                continue;
+            }
+            return Some(latest);
+        }
+        None
+    }
+}
+
+fn chunk_priority(curr_chunk: IVec3, target_chunk: IVec3, is_replacing: bool) -> i32 {
+    let dx = target_chunk.x - curr_chunk.x;
+    let dz = target_chunk.z - curr_chunk.z;
+    let dist2 = dx * dx + dz * dz;
+    let replace_bonus = if is_replacing { 1_000_000 } else { 0 };
+    -dist2 + replace_bonus
+}
+
 #[derive(Resource, Default)]
 pub struct ToBeInvalidatedChunks {
     pub chunks: HashMap<IVec3, Vec<Entity>>,
@@ -132,7 +237,6 @@ pub struct ToBeInvalidatedChunks {
 
 #[derive(Resource)]
 pub struct ChunkChannel {
-    pub processing_queue: HashMap<IVec3, ProcessingChunk>,
     pub sender: Sender<(ChunkLoadInfo, Option<Mesh>, VoxelData)>,
     pub receiver: Mutex<Receiver<(ChunkLoadInfo, Option<Mesh>, VoxelData)>>,
 }
