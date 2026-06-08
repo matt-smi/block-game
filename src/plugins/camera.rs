@@ -29,6 +29,19 @@ struct Sun;
 #[derive(Component)]
 struct Moon;
 
+type SunLightQuery<'w, 's> = Query<
+    'w,
+    's,
+    (&'static mut Transform, &'static mut DirectionalLight),
+    (With<Sun>, Without<Moon>),
+>;
+type MoonLightQuery<'w, 's> = Query<
+    'w,
+    's,
+    (&'static mut Transform, &'static mut DirectionalLight),
+    (With<Moon>, Without<Sun>),
+>;
+
 #[derive(Component)]
 pub struct CameraPlugin;
 impl Plugin for CameraPlugin {
@@ -115,8 +128,8 @@ fn advance_time_of_day(mut time_of_day: ResMut<TimeOfDay>, clock: Res<Time>) {
 fn apply_day_night(
     time_of_day: Res<TimeOfDay>,
     mut ambient: ResMut<AmbientLight>,
-    mut sun: Query<(&mut Transform, &mut DirectionalLight), (With<Sun>, Without<Moon>)>,
-    mut moon: Query<(&mut Transform, &mut DirectionalLight), (With<Moon>, Without<Sun>)>,
+    mut sun: SunLightQuery,
+    mut moon: MoonLightQuery,
     mut fog: Query<&mut DistanceFog, With<Camera3d>>,
 ) {
     let palette = day_night_palette(time_of_day.fraction);

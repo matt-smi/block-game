@@ -33,6 +33,8 @@ pub const CHUNK_DATA_SIZE: usize = (CHUNK_DIMENSION * CHUNK_DIMENSION * CHUNK_DI
 pub const WORLD_VOXEL_SIZE: f32 = 1.0;
 pub const CHUNK_WORLD_SIZE: f32 = CHUNK_DIMENSION as f32 * WORLD_VOXEL_SIZE;
 pub const LOD_INTERVAL: u8 = 20;
+pub const MAX_CONCURRENT_CHUNK_JOBS: usize = 90;
+pub const DISTANCE_MAX_PRIORITY: i32 = 12;
 
 #[derive(Component)]
 struct _ChunkCoord(IVec3);
@@ -135,6 +137,7 @@ pub struct ChunkTaskRequest {
     pub is_replacing: bool,
     pub job_id: u64,
     pub priority: i32,
+    pub is_down_sample: bool,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -174,14 +177,16 @@ impl ChunkScheduler {
         pos: IVec3,
         lod: u8,
         is_replacing: bool,
+        is_down_sample: bool,
         curr_chunk: IVec3,
     ) -> ChunkTaskRequest {
         self.next_job_id += 1;
-        let priority = chunk_priority(curr_chunk, pos, is_replacing);
+        let priority = chunk_priority(curr_chunk, pos, is_replacing, is_down_sample);
         let request = ChunkTaskRequest {
             pos,
             lod,
             is_replacing,
+            is_down_sample,
             job_id: self.next_job_id,
             priority,
         };
@@ -204,7 +209,12 @@ impl ChunkScheduler {
             if latest.job_id != entry.job_id || self.in_flight.contains_key(&entry.pos) {
                 continue;
             }
-            latest.priority = chunk_priority(curr_chunk, latest.pos, latest.is_replacing);
+            latest.priority = chunk_priority(
+                curr_chunk,
+                latest.pos,
+                latest.is_replacing,
+                latest.is_down_sample,
+            );
             if latest.priority != entry.priority {
                 self.latest.insert(entry.pos, latest);
                 self.pending.push(QueuedChunkJob {
@@ -222,11 +232,23 @@ impl ChunkScheduler {
     }
 }
 
-fn chunk_priority(curr_chunk: IVec3, target_chunk: IVec3, is_replacing: bool) -> i32 {
+fn chunk_priority(
+    curr_chunk: IVec3,
+    target_chunk: IVec3,
+    is_replacing: bool,
+    is_down_sample: bool,
+) -> i32 {
     let dx = target_chunk.x - curr_chunk.x;
     let dz = target_chunk.z - curr_chunk.z;
     let dist2 = dx * dx + dz * dz;
-    let replace_bonus = if is_replacing { 1_000_000 } else { 0 };
+    if dist2 < DISTANCE_MAX_PRIORITY {
+        return 500_000;
+    }
+    let replace_bonus = if is_replacing && !is_down_sample {
+        1_000_000
+    } else {
+        0
+    };
     -dist2 + replace_bonus
 }
 

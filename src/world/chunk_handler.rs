@@ -2,24 +2,37 @@ use crate::plugins::{movement::Movement, player::Player};
 use crate::world::generate_chunk;
 use crate::world::{
     CHUNK_RENDER_DISTANCE, CHUNK_WORLD_SIZE, CHUNK_Y_COUNT, ChunkChannel, ChunkEntities,
-    ChunkLoadInfo, ChunkScheduler, ChunkVoxels, LastChunk, RunningChunkJob, TerrainMaterial,
-    ToBeInvalidatedChunks, VoxelData, chunk_view_generator, chunk_world_origin, generate_mesh,
-    get_lod, xz_chunk_manhattan_distance,
+    ChunkLoadInfo, ChunkScheduler, ChunkVoxels, LastChunk, MAX_CONCURRENT_CHUNK_JOBS,
+    RunningChunkJob, TerrainMaterial, ToBeInvalidatedChunks, VoxelData, chunk_view_generator,
+    chunk_world_origin, generate_mesh, get_lod, xz_chunk_manhattan_distance,
 };
 use bevy::ecs::relationship::RelationshipSourceCollection;
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use bevy::tasks::AsyncComputeTaskPool;
 
 use std::sync::Mutex;
 use std::sync::mpsc::channel;
 
-const MAX_CONCURRENT_CHUNK_JOBS: usize = 20;
-const MAX_ASYNC_RESULTS_PER_FRAME: usize = 30;
+const MAX_ASYNC_RESULTS_PER_FRAME: usize = 15; // with no throttles, usually ~150 chunks per frame, only ever want a total of ~300 being processed total
 const SYNC_CHUNK_DISTANCE: u32 = 1;
 
 #[derive(Resource, Default)]
 struct SynchronousChunkLoads {
     queue: Vec<(ChunkLoadInfo, Option<Mesh>, VoxelData)>,
+}
+
+#[derive(SystemParam)]
+struct ProcessChunkMeshesParams<'w, 's> {
+    scheduler: ResMut<'w, ChunkScheduler>,
+    chunk_channel: Res<'w, ChunkChannel>,
+    meshes: ResMut<'w, Assets<Mesh>>,
+    terrain_material: Res<'w, TerrainMaterial>,
+    chunk_entities: ResMut<'w, ChunkEntities>,
+    chunk_voxels: ResMut<'w, ChunkVoxels>,
+    to_be_invalidated: ResMut<'w, ToBeInvalidatedChunks>,
+    synchronous_loads: ResMut<'w, SynchronousChunkLoads>,
+    commands: Commands<'w, 's>,
 }
 
 pub struct ChunkHandlerPlugin;
@@ -110,7 +123,7 @@ fn prune_chunks(
         if let Ok(mut e) = commands.get_entity(entity) {
             e.despawn();
         }
-    
+
         if let Ok(mut e) = commands.get_entity(entity) {
             e.despawn();
         }
@@ -126,7 +139,7 @@ fn update_chunk_lods(
 ) {
     let (transform, _, _) = single.into_inner();
     let curr_chunk = get_chunk_index(transform.translation);
-    let to_remesh: Vec<(IVec3, u8)> = chunk_voxels
+    let to_remesh: Vec<(IVec3, u8, bool)> = chunk_voxels
         .chunks
         .iter()
         .filter_map(|(&pos, voxel_data)| {
@@ -134,12 +147,12 @@ fn update_chunk_lods(
             if desired_lod == voxel_data.lod {
                 None
             } else {
-                Some((pos, desired_lod))
+                Some((pos, desired_lod, desired_lod < voxel_data.lod))
             }
         })
         .collect();
 
-    for (pos, lod) in to_remesh {
+    for (pos, lod, is_down_sample) in to_remesh {
         if scheduler
             .latest
             .get(&pos)
@@ -150,7 +163,7 @@ fn update_chunk_lods(
         if let Some(entities) = chunk_entities.chunks.remove(&pos) {
             to_be_invalidated.chunks.insert(pos, entities);
         }
-        scheduler.request(pos, lod, true, curr_chunk);
+        scheduler.request(pos, lod, true, is_down_sample, curr_chunk);
     }
 }
 
@@ -174,7 +187,7 @@ fn request_desired_chunks(
                     continue;
                 }
                 let lod = get_lod(curr_chunk, chunk_pos);
-                scheduler.request(chunk_pos, lod, false, curr_chunk);
+                scheduler.request(chunk_pos, lod, false, false, curr_chunk);
             }
         }
     }
@@ -239,7 +252,7 @@ fn load_synchronous_chunks(
         }
 
         let is_replacing = to_be_invalidated.chunks.contains_key(&chunk_pos);
-        let request = scheduler.request(chunk_pos, 0, is_replacing, curr_chunk);
+        let request = scheduler.request(chunk_pos, 0, is_replacing, false, curr_chunk);
         scheduler.in_flight.insert(
             chunk_pos,
             RunningChunkJob {
@@ -278,18 +291,19 @@ fn synchronous_chunk_positions(curr_chunk: IVec3) -> impl Iterator<Item = IVec3>
     })
 }
 
-fn process_chunk_meshes(
-    single: Single<Movement, With<Player>>,
-    mut scheduler: ResMut<ChunkScheduler>,
-    chunk_channel: Res<ChunkChannel>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    terrain_material: Res<TerrainMaterial>,
-    mut chunk_entities: ResMut<ChunkEntities>,
-    mut chunk_voxels: ResMut<ChunkVoxels>,
-    mut to_be_invalidated: ResMut<ToBeInvalidatedChunks>,
-    mut synchronous_loads: ResMut<SynchronousChunkLoads>,
-    mut commands: Commands,
-) {
+fn process_chunk_meshes(single: Single<Movement, With<Player>>, params: ProcessChunkMeshesParams) {
+    let ProcessChunkMeshesParams {
+        mut scheduler,
+        chunk_channel,
+        mut meshes,
+        terrain_material,
+        mut chunk_entities,
+        mut chunk_voxels,
+        mut to_be_invalidated,
+        mut synchronous_loads,
+        mut commands,
+    } = params;
+
     let (transform, _, _) = single.into_inner();
     let curr_chunk = get_chunk_index(transform.translation);
 

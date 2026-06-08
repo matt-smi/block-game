@@ -73,7 +73,7 @@ pub fn perlin2(x: f64, y: f64) -> f64 {
 }
 
 /// Fractal Brownian Motion — stacks `octaves` layers of Perlin noise.
-pub fn fbm(mut x: f64, mut y: f64, octaves: u32, lacunarity: f64, gain: f64) -> f64 {
+pub fn fbm(x: f64, y: f64, octaves: u32, lacunarity: f64, gain: f64) -> f64 {
     let mut value = 0.0;
     let mut amplitude = 0.5;
     let mut frequency = 1.0;
