@@ -123,9 +123,7 @@ fn player_move(
     }
 
     let mut jumped_this_frame = false;
-    if
-    //(motion_state.coyote_time_remaining > 0.0) //motion_state.grounded || &&
-    action_state.just_pressed(&GameAction::Jump) {
+    if (motion_state.coyote_time_remaining > 0.0) || motion_state.grounded && action_state.just_pressed(&GameAction::Jump) {
         linear_velocity.y = JUMP_VELOCITY;
         motion_state.coyote_time_remaining = 0.0;
         motion_state.grounded = false;
