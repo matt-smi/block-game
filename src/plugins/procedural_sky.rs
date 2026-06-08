@@ -1,6 +1,6 @@
 use bevy::{
     asset::RenderAssetUsages,
-    image::{ImageSampler},
+    image::ImageSampler,
     prelude::*,
     render::render_resource::{
         Extent3d, TextureDimension, TextureFormat, TextureViewDescriptor, TextureViewDimension,

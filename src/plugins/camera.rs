@@ -9,8 +9,8 @@ use crate::common::{GameAction, GameState};
 use crate::plugins::movement::Movement;
 use crate::plugins::player::Player;
 use crate::plugins::procedural_sky::{
-    day_night_palette, generate_sunset_cubemap, moon_rotation, sun_direction, sun_rotation,
-    TimeOfDay,
+    TimeOfDay, day_night_palette, generate_sunset_cubemap, moon_rotation, sun_direction,
+    sun_rotation,
 };
 use crate::world::{CHUNK_RENDER_DISTANCE, CHUNK_WORLD_SIZE};
 
@@ -48,11 +48,7 @@ impl Plugin for CameraPlugin {
     }
 }
 
-fn setup(
-    mut commands: Commands,
-    mut images: ResMut<Assets<Image>>,
-    time_of_day: Res<TimeOfDay>,
-) {
+fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>, time_of_day: Res<TimeOfDay>) {
     let palette = day_night_palette(time_of_day.fraction);
     let sun_dir = sun_direction(time_of_day.fraction);
     let skybox_image = images.add(generate_sunset_cubemap(sun_dir));
@@ -112,8 +108,8 @@ fn advance_time_of_day(mut time_of_day: ResMut<TimeOfDay>, clock: Res<Time>) {
     if time_of_day.seconds_per_day <= 0.0 {
         return;
     }
-    time_of_day.fraction = (time_of_day.fraction + clock.delta_secs() / time_of_day.seconds_per_day)
-        % 1.0;
+    time_of_day.fraction =
+        (time_of_day.fraction + clock.delta_secs() / time_of_day.seconds_per_day) % 1.0;
 }
 
 fn apply_day_night(

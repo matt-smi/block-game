@@ -1,10 +1,10 @@
 use crate::plugins::{movement::Movement, player::Player};
 use crate::world::generate_chunk;
 use crate::world::{
-    chunk_view_generator, chunk_world_origin, generate_mesh, get_lod, xz_chunk_manhattan_distance,
     CHUNK_RENDER_DISTANCE, CHUNK_WORLD_SIZE, CHUNK_Y_COUNT, ChunkChannel, ChunkEntities,
-    ChunkLoadInfo, ChunkScheduler, ChunkVoxels, LastChunk, RunningChunkJob,
-    TerrainMaterial, ToBeInvalidatedChunks, VoxelData,
+    ChunkLoadInfo, ChunkScheduler, ChunkVoxels, LastChunk, RunningChunkJob, TerrainMaterial,
+    ToBeInvalidatedChunks, VoxelData, chunk_view_generator, chunk_world_origin, generate_mesh,
+    get_lod, xz_chunk_manhattan_distance,
 };
 use bevy::ecs::relationship::RelationshipSourceCollection;
 use bevy::prelude::*;
@@ -51,7 +51,6 @@ fn set_up_chunk_async(mut command: Commands) {
     });
 }
 
-
 fn chunk_changed(
     player: Single<&Transform, With<Player>>,
     last_chunk: Option<Res<LastChunk>>,
@@ -83,9 +82,8 @@ fn prune_chunks(
     let min_z = curr_chunk.z - CHUNK_RENDER_DISTANCE;
     let max_z = curr_chunk.z + CHUNK_RENDER_DISTANCE;
 
-    let in_bounds = |key: &IVec3| {
-        key.x >= min_x && key.x <= max_x && key.z >= min_z && key.z <= max_z
-    };
+    let in_bounds =
+        |key: &IVec3| key.x >= min_x && key.x <= max_x && key.z >= min_z && key.z <= max_z;
 
     chunk_entities.chunks.retain(|key, entities| {
         let keep = in_bounds(key);
@@ -357,9 +355,10 @@ fn process_chunk_meshes(
 }
 
 fn is_current_chunk_job(scheduler: &ChunkScheduler, load_info: ChunkLoadInfo) -> bool {
-    scheduler.in_flight.get(&load_info.pos).is_some_and(|job| {
-        job.lod == load_info.lod && job.job_id == load_info.job_id
-    })
+    scheduler
+        .in_flight
+        .get(&load_info.pos)
+        .is_some_and(|job| job.lod == load_info.lod && job.job_id == load_info.job_id)
 }
 
 fn finish_chunk_job(scheduler: &mut ChunkScheduler, load_info: ChunkLoadInfo) {
@@ -394,7 +393,9 @@ fn restore_invalidated_chunk(
 
 fn update_last_chunk(player: Single<&Transform, With<Player>>, mut commands: Commands) {
     let curr_chunk = get_chunk_index(player.translation);
-    commands.insert_resource(LastChunk { chunk_pos: curr_chunk });
+    commands.insert_resource(LastChunk {
+        chunk_pos: curr_chunk,
+    });
 }
 
 pub fn get_chunk_index(world_position: Vec3) -> IVec3 {
