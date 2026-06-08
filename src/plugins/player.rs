@@ -8,7 +8,7 @@ use crate::plugins::camera::Angles2D;
 use crate::plugins::movement::*;
 use crate::world::{CHUNK_DIMENSION, ChunkVoxels, global_voxel_to_chunk, world_to_global_voxel};
 
-const PLAYER_SPEED: f32 = 110.0;
+const PLAYER_SPEED: f32 = 60.0;
 const JUMP_VELOCITY: f32 = 15.5;
 const PLAYER_GRAVITY: f32 = 35.0;
 const PLAYER_SCALE: f32 = 0.5;
@@ -123,9 +123,7 @@ fn player_move(
     }
 
     let mut jumped_this_frame = false;
-    if
-    //(motion_state.coyote_time_remaining > 0.0) //motion_state.grounded || &&
-    action_state.just_pressed(&GameAction::Jump) {
+    if ((motion_state.coyote_time_remaining > 0.0) || motion_state.grounded) && action_state.just_pressed(&GameAction::Jump) {
         linear_velocity.y = JUMP_VELOCITY;
         motion_state.coyote_time_remaining = 0.0;
         motion_state.grounded = false;
