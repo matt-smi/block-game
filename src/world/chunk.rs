@@ -26,7 +26,7 @@ pub const VOXEL_MAPPING: VoxelMapping = VoxelMapping {
     ],
 };
 
-pub const CHUNK_RENDER_DISTANCE: i32 = 32;
+pub const CHUNK_RENDER_DISTANCE: i32 = 48;
 pub const CHUNK_Y_COUNT: i32 = 10;
 pub const CHUNK_DIMENSION: u32 = 32;
 pub const CHUNK_DATA_SIZE: usize = (CHUNK_DIMENSION * CHUNK_DIMENSION * CHUNK_DIMENSION) as usize;
@@ -47,7 +47,7 @@ pub struct VoxelData {
     these two fields are easily derivable from voxels size, but I'm going to make it explicit for now
 
     lod value can be 0-3:
-        (0 - 24 chunks)        (24 - 48 chunks)      (48 - 72 chunks)     (72 - 96 chunks)
+        (0 - LOD_INTERVAL chunks)     (LOD_INTERVAL - LOD_INTERVAL * 2 chunks)  ...
         lod = 0 -> 32 x 32 x 32, lod = 1 -> 16 x 16 x 16, lod = 2 -> 8 x 8 x 8, lod = 3 -> 4 x 4 x 4
         voxel_scale:    1                        2                       4                     8
     */
