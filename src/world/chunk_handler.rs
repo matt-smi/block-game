@@ -111,6 +111,10 @@ fn prune_chunks(
             e.despawn();
         }
     }
+        if let Ok(mut e) = commands.get_entity(entity) {
+            e.despawn();
+        }
+    }
 }
 
 fn update_chunk_lods(
