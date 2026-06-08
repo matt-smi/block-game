@@ -110,7 +110,7 @@ fn prune_chunks(
         if let Ok(mut e) = commands.get_entity(entity) {
             e.despawn();
         }
-    }
+    
         if let Ok(mut e) = commands.get_entity(entity) {
             e.despawn();
         }
