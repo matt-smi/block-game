@@ -26,7 +26,7 @@ pub const VOXEL_MAPPING: VoxelMapping = VoxelMapping {
     ],
 };
 
-pub const CHUNK_RENDER_DISTANCE: i32 = 48;
+pub const CHUNK_RENDER_DISTANCE: i32 = 12;
 pub const CHUNK_Y_COUNT: i32 = 10;
 pub const CHUNK_DIMENSION: u32 = 32;
 pub const CHUNK_DATA_SIZE: usize = (CHUNK_DIMENSION * CHUNK_DIMENSION * CHUNK_DIMENSION) as usize;

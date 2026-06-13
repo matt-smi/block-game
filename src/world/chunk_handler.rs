@@ -14,7 +14,7 @@ use bevy::tasks::AsyncComputeTaskPool;
 use std::sync::Mutex;
 use std::sync::mpsc::channel;
 
-const MAX_ASYNC_RESULTS_PER_FRAME: usize = 15; // with no throttles, usually ~150 chunks per frame, only ever want a total of ~300 being processed total
+const MAX_ASYNC_RESULTS_PER_FRAME: usize = 7; // with no throttles, usually ~150 chunks per frame, only ever want a total of ~300 being processed total
 const SYNC_CHUNK_DISTANCE: u32 = 1;
 
 #[derive(Resource, Default)]
@@ -120,10 +120,6 @@ fn prune_chunks(
     scheduler.in_flight.retain(|key, _| in_bounds(key));
 
     for entity in to_despawn {
-        if let Ok(mut e) = commands.get_entity(entity) {
-            e.despawn();
-        }
-
         if let Ok(mut e) = commands.get_entity(entity) {
             e.despawn();
         }
