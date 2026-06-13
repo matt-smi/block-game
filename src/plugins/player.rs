@@ -6,15 +6,15 @@ use leafwing_input_manager::prelude::*;
 use crate::common::*;
 use crate::plugins::camera::Angles2D;
 use crate::plugins::movement::*;
-use crate::world::{ChunkVoxels, is_solid_global_voxel, world_to_global_voxel};
+use crate::world::{CHUNK_DIMENSION, ChunkVoxels, global_voxel_to_chunk, world_to_global_voxel};
 
-const PLAYER_SPEED: f32 = 10.0;
+const PLAYER_SPEED: f32 = 60.0;
 const JUMP_VELOCITY: f32 = 15.5;
 const PLAYER_GRAVITY: f32 = 35.0;
 const PLAYER_SCALE: f32 = 0.5;
 const PLAYER_SPRINT_SPEED: f32 = PLAYER_SPEED * 1.5;
-const PLAYER_HALF_EXTENTS: Vec3 = Vec3::new(0.24, 0.5, 0.24);
-const PLAYER_UPWARD_HALF_EXTENTS: Vec3 = Vec3::new(0.18, 0.5, 0.18);
+const PLAYER_HALF_EXTENTS: Vec3 = Vec3::new(0.48, 1.0, 0.48);
+const PLAYER_UPWARD_HALF_EXTENTS: Vec3 = Vec3::new(0.36, 1.0, 0.36);
 const PLAYER_SKIN_WIDTH: f32 = 0.001;
 const COLLISION_BINARY_STEPS: usize = 10;
 const COYOTE_TIME: f32 = 0.08;
@@ -50,9 +50,9 @@ fn spawn_player(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let body = meshes.add(Cuboid::new(
-        2. * PLAYER_SCALE,
         4. * PLAYER_SCALE,
-        2. * PLAYER_SCALE,
+        8. * PLAYER_SCALE,
+        4. * PLAYER_SCALE,
     ));
 
     let handle = materials.add(StandardMaterial {
@@ -123,7 +123,7 @@ fn player_move(
     }
 
     let mut jumped_this_frame = false;
-    if (motion_state.grounded || motion_state.coyote_time_remaining > 0.0)
+    if ((motion_state.coyote_time_remaining > 0.0) || motion_state.grounded)
         && action_state.just_pressed(&GameAction::Jump)
     {
         linear_velocity.y = JUMP_VELOCITY;
@@ -236,12 +236,38 @@ fn collides_at(position: Vec3, chunk_voxels: &ChunkVoxels, half_extents: Vec3) -
 
     let min_voxel = world_to_global_voxel(min);
     let max_voxel = world_to_global_voxel(max);
+    let (min_chunk, _) = global_voxel_to_chunk(min_voxel);
+    let (max_chunk, _) = global_voxel_to_chunk(max_voxel);
 
-    for x in min_voxel.x..=max_voxel.x {
-        for y in min_voxel.y..=max_voxel.y {
-            for z in min_voxel.z..=max_voxel.z {
-                if is_solid_global_voxel(chunk_voxels, IVec3::new(x, y, z)) {
-                    return true;
+    for cx in min_chunk.x..=max_chunk.x {
+        for cy in min_chunk.y..=max_chunk.y {
+            for cz in min_chunk.z..=max_chunk.z {
+                let chunk_pos = IVec3::new(cx, cy, cz);
+                let Some(voxel_data) = chunk_voxels.chunks.get(&chunk_pos) else {
+                    continue;
+                };
+
+                let chunk_min_x = (cx * CHUNK_DIMENSION as i32).max(min_voxel.x);
+                let chunk_max_x =
+                    (cx * CHUNK_DIMENSION as i32 + CHUNK_DIMENSION as i32 - 1).min(max_voxel.x);
+                let chunk_min_y = (cy * CHUNK_DIMENSION as i32).max(min_voxel.y);
+                let chunk_max_y =
+                    (cy * CHUNK_DIMENSION as i32 + CHUNK_DIMENSION as i32 - 1).min(max_voxel.y);
+                let chunk_min_z = (cz * CHUNK_DIMENSION as i32).max(min_voxel.z);
+                let chunk_max_z =
+                    (cz * CHUNK_DIMENSION as i32 + CHUNK_DIMENSION as i32 - 1).min(max_voxel.z);
+
+                for x in chunk_min_x..=chunk_max_x {
+                    let lx = x.rem_euclid(CHUNK_DIMENSION as i32) as u32;
+                    for y in chunk_min_y..=chunk_max_y {
+                        let ly = y.rem_euclid(CHUNK_DIMENSION as i32) as u32;
+                        for z in chunk_min_z..=chunk_max_z {
+                            let lz = z.rem_euclid(CHUNK_DIMENSION as i32) as u32;
+                            if voxel_data.is_solid(lx, ly, lz) {
+                                return true;
+                            }
+                        }
+                    }
                 }
             }
         }
